@@ -57,6 +57,7 @@ add_library(
         IMPORTED
 )
 
+
 # This is the built in NDK logging library
 find_library(log-lib log)
 add_subdirectory(freetype/freetype)
@@ -97,6 +98,7 @@ set_target_properties(
         ${SDL_SO_DIR}/libmpg123.so
 )
 
+
 # We will tell our build system where to look for third party header files.
 include_directories(${SDL_DIR}/include)
 include_directories(${SDL_MIXER_DIR}/include)
@@ -125,7 +127,6 @@ add_library(
 # Finally, we need to link all the libraries we want to use in our project together, remembering that the 'a-simple-triangle' library is in fact our own C++ code. Note also we are including the 'GLESv2' library for OpenGL ES2 support, though we don't need to define it ourselves with the 'add_library' commands.
 target_link_libraries(
         android
-#        hidapi
         sdl2
         sdl2_mixer
         sdl2_net
@@ -135,6 +136,7 @@ target_link_libraries(
         glm
         ${log-lib}
         GLESv3
+        EGL
 )
 
 target_compile_definitions(android PRIVATE ${GL_PROFILES})

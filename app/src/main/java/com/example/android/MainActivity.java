@@ -2,7 +2,6 @@ package com.example.android;
 
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
-
 import org.libsdl.app.SDLActivity;
 
 public class MainActivity extends SDLActivity {
@@ -13,6 +12,8 @@ public class MainActivity extends SDLActivity {
                 "SDL2_mixer",
                 "SDL2_net",
                 "SDL2_image",
+                "EGL",
+                "GLESv3",
                 "android"
         };
     }
@@ -21,5 +22,8 @@ public class MainActivity extends SDLActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        System.out.println(stringFromJNI());
     }
+
+    public native String stringFromJNI();
 }
