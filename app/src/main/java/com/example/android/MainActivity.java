@@ -27,15 +27,8 @@ public class MainActivity extends SDLActivity {
         System.out.println("Hello world!!");
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        initFireBaseAdds();
+//FIREBASE_INIT
     }
 
-    @Override
-    protected void finalize() throws Throwable {
-        super.finalize();
-        destroy();
-    }
-
-    public native void initFireBaseAdds();
-    public native void destroy();
+//FIREBASE_DEFINE
 }
