@@ -1,4 +1,6 @@
 apply plugin: 'com.android.application'
+//FIREBASE_APPLY_GOOGLE_SERVICES
+
 
 android {
     buildToolsVersion engine.buildToolsVersion
@@ -40,5 +42,7 @@ android {
 
 dependencies {
     implementation project(':sdl')
-
+//FIREBASE_DEPENDENCIES
 }
+
+//FIREBASE_APPLY_AND_DEPENDENCIES
