@@ -9,3 +9,5 @@ pluginManagement {
 rootProject.name = "android"
 include ':app'
 include ':sdl'
+
+//FIREBASE
