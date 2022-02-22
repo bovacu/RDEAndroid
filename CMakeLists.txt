@@ -117,16 +117,7 @@ file(GLOB_RECURSE CPP_SOURCES ${MAIN_SOURCE_DIR}/src/*.cpp   ${SANDBOX_SOURCE_DI
 
 set(GL_PROFILES "GL_PROFILE_GLES2" "GL_PROFILE_GLES3")
 
-add_library(
-        android
-        SHARED
-        ${CPP_HEADERS}
-        ${CPP_SOURCES}
-)
-
-# Finally, we need to link all the libraries we want to use in our project together, remembering that the 'a-simple-triangle' library is in fact our own C++ code. Note also we are including the 'GLESv2' library for OpenGL ES2 support, though we don't need to define it ourselves with the 'add_library' commands.
-target_link_libraries(
-        android
+set(TARGET_LIBRARIES
         sdl2
         sdl2_mixer
         sdl2_net
@@ -137,6 +128,21 @@ target_link_libraries(
         ${log-lib}
         GLESv3
         EGL
+    )
+
+#GDEFirebase
+
+add_library(
+        android
+        SHARED
+        ${CPP_HEADERS}
+        ${CPP_SOURCES}
+)
+
+# Finally, we need to link all the libraries we want to use in our project together, remembering that the 'a-simple-triangle' library is in fact our own C++ code. Note also we are including the 'GLESv2' library for OpenGL ES2 support, though we don't need to define it ourselves with the 'add_library' commands.
+target_link_libraries(
+        android
+        ${TARGET_LIBRARIES}
 )
 
 target_compile_definitions(android PRIVATE ${GL_PROFILES})
