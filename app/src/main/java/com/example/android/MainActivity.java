@@ -4,7 +4,7 @@ import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.view.WindowManager;
 
-import com.google.android.gms.ads.MobileAds;
+//import com.google.android.gms.ads.MobileAds;
 import org.libsdl.app.SDLActivity;
 
 public class MainActivity extends SDLActivity {
@@ -17,7 +17,7 @@ public class MainActivity extends SDLActivity {
                 "SDL2_image",
                 "EGL",
                 "GLESv3",
-                "android"
+                "GDEAndroid"
         };
     }
 
