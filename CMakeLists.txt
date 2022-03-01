@@ -5,7 +5,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fexceptions")
 
 # Determine what build type we are in, shifted to lower case (debug or release).
 string(TOLOWER ${CMAKE_BUILD_TYPE} BUILD_VARIANT_DIR)
-set(GDE_PATH "home/borja/Documents/C++/GDE")
+set(GDE_PATH "/home/borja/Documents/C++/GDE")
 
 # Location of our third party libraries.
 set(LIBS "${GDE_PATH}/submodules")
@@ -40,11 +40,11 @@ add_library(
         IMPORTED
 )
 
-add_library(
-        sdl2_net
-        SHARED
-        IMPORTED
-)
+#add_library(
+#        sdl2_net
+#        SHARED
+#        IMPORTED
+#)
 
 add_library(
         sdl2_image
@@ -78,12 +78,12 @@ set_target_properties(
         ${SDL_SO_DIR}/libSDL2_mixer.so
 )
 
-set_target_properties(
-        sdl2_net
-        PROPERTIES
-        IMPORTED_LOCATION
-        ${SDL_SO_DIR}/libSDL2_net.so
-)
+#set_target_properties(
+#        sdl2_net
+#        PROPERTIES
+#        IMPORTED_LOCATION
+#        ${SDL_SO_DIR}/libSDL2_net.so
+#)
 
 set_target_properties(
         sdl2_image
@@ -121,7 +121,7 @@ set(GL_PROFILES "GL_PROFILE_GLES2" "GL_PROFILE_GLES3")
 set(TARGET_LIBRARIES
         sdl2
         sdl2_mixer
-        sdl2_net
+#        sdl2_net
         sdl2_image
         mpg123
         freetype

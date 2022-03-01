@@ -13,7 +13,7 @@ public class MainActivity extends SDLActivity {
         return new String[]{
                 "SDL2",
                 "SDL2_mixer",
-                "SDL2_net",
+//                "SDL2_net",
                 "SDL2_image",
                 "EGL",
                 "GLESv3",
