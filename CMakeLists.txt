@@ -111,10 +111,11 @@ include_directories(${MAIN_SOURCE_DIR}/include)
 include_directories(${SANDBOX_SOURCE_DIR})
 include_directories(${EXTERNAL_STB})
 include_directories(.)
+include_directories(../../code/include)
 
 # We will recursively collate all .hpp header and .cpp source files under the main source directory as the input for the compilation.
-file(GLOB_RECURSE CPP_HEADERS ${MAIN_SOURCE_DIR}/include/*.h*  ${SANDBOX_SOURCE_DIR}/*.h*)
-file(GLOB_RECURSE CPP_SOURCES ${MAIN_SOURCE_DIR}/src/*.cpp   ${SANDBOX_SOURCE_DIR}/*.cpp)
+file(GLOB_RECURSE CPP_HEADERS ${MAIN_SOURCE_DIR}/include/*.h*  ../../code/include/*.h*)
+file(GLOB_RECURSE CPP_SOURCES ${MAIN_SOURCE_DIR}/src/*.cpp   ../../code/src/*.cpp)
 
 set(GL_PROFILES "GL_PROFILE_GLES2" "GL_PROFILE_GLES3")
 
@@ -136,6 +137,7 @@ set(TARGET_LIBRARIES
 add_library(
         GDEAndroid
         SHARED
+        ../../main.cpp
         ${CPP_HEADERS}
         ${CPP_SOURCES}
 )
