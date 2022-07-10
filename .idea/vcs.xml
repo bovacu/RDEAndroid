@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="VcsDirectoryMappings">
-    <mapping directory="$PROJECT_DIR$/../.." vcs="Git" />
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/jni/Engine2.0" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/jni/GDE" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/freetype/freetype" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/glm/glm" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/sdl/jni/SDL_net" vcs="Git" />
   </component>
 </project>

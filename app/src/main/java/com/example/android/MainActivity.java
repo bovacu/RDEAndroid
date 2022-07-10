@@ -13,9 +13,10 @@ public class MainActivity extends SDLActivity {
         return new String[]{
                 "SDL2",
                 "SDL2_mixer",
-//                "SDL2_net",
                 "SDL2_image",
                 "EGL",
+                "box2d",
+                "yaml-cpp",
                 "GLESv3",
                 "GDEAndroid"
         };
@@ -24,8 +25,7 @@ public class MainActivity extends SDLActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        System.out.println("Hello world!!");
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 //FIREBASE_INIT
     }
