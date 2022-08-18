@@ -16,7 +16,6 @@ public class MainActivity extends SDLActivity {
                 "SDL2_image",
                 "EGL",
                 "box2d",
-                "yaml-cpp",
                 "GLESv3",
                 "GDEAndroid"
         };
