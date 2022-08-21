@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.18.1)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fexceptions")
 
 # Determine what build type we are in, shifted to lower case (debug or release).
+set(CMAKE_BUILD_TYPE "release")
 string(TOLOWER ${CMAKE_BUILD_TYPE} BUILD_VARIANT_DIR)
 set(GDE_PATH "/home/borja/Documents/GDE")
 
@@ -114,9 +115,11 @@ include_directories(${ENTT_DIR}/src/)
 include_directories(${BOX2D_DIR}/include/)
 include_directories(${JSON_DIR})
 
+set(APP_HEADERS)
+set(APP_HEADERS)
 # We will recursively collate all .hpp header and .cpp source files under the main source directory as the input for the compilation.
-file(GLOB_RECURSE CPP_HEADERS ${MAIN_SOURCE_DIR}/include/*.h*  ../../code/include/*.h*)
-file(GLOB_RECURSE CPP_SOURCES ${MAIN_SOURCE_DIR}/src/*.cpp   ../../code/src/*.cpp)
+file(GLOB_RECURSE CPP_HEADERS ${MAIN_SOURCE_DIR}/include/*.h* ${APP_SOURCES}/*.h*)
+file(GLOB_RECURSE CPP_SOURCES ${MAIN_SOURCE_DIR}/src/*.cpp ${APP_HEADERS}/*.cpp  ../../code/src/*.cpp)
 
 set(GL_PROFILES "GL_PROFILE_GLES2" "GL_PROFILE_GLES3")
 
@@ -139,7 +142,6 @@ set(TARGET_LIBRARIES
 add_library(
         GDEAndroid
         SHARED
-        app/main.cpp
         ${CPP_HEADERS}
         ${CPP_SOURCES}
 )
