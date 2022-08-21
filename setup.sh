@@ -28,9 +28,9 @@ fi
 
 rm sdl/jni/GDE
 rm app/jni/GDE
-ln -s "$GDE_PATH" .
-ln -s "$GDE_PATH" ../../app/jni
-sh sdl/jni/buildAndroidLibs.sh "$GDE_ANDROID_PATH" "$NDK_PATH"
+ln -s "$GDE_PATH" sdl/jni
+ln -s "$GDE_PATH" app/jni
+cd sdl/jni/ && ./buildAndroidLibs.sh "$GDE_ANDROID_PATH" "$NDK_PATH"
 
 echo "REMEMBER: cmake version should be 3.18.1, if yours is not go download that version from"
 echo "SDK Manager and then go to app/build.gradle, there in externalNativeBuild, inside cmake add ' version '3.18.1' '"
