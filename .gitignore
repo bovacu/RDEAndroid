@@ -15,9 +15,3 @@
 local.properties
 
 firebase_cpp_sdk
-
-freetype/
-
-glm/
-
-entt/
