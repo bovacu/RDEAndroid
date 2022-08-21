@@ -15,3 +15,11 @@
 local.properties
 
 firebase_cpp_sdk
+
+apk/release/app-release.apk
+
+apk/release/output-metadata.json
+
+apk/debug/app-debug.apk
+
+apk/debug/output-metadata.json
