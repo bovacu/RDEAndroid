@@ -29,7 +29,7 @@ then
     exit 0
 fi
 
-if [ -z "$APP_SOURCES" ]
+if [ -z "$BUILD_TYPE" ]
 then
     echo "Fifth enter the build type, debug or release"
     exit 0
