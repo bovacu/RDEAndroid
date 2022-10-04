@@ -15,7 +15,7 @@ public class MainActivity extends SDLActivity {
                 "SDL2_mixer",
                 "SDL2_image",
                 "EGL",
-                "box2d",
+                "chipmunk",
                 "GLESv3",
                 "GDEAndroid"
         };
