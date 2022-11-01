@@ -2,7 +2,8 @@
 
 GDE_PATH="$1"
 GDE_ANDROID_PATH="$2"
-NDK_PATH="$3"
+SDK_PATH="$3"
+NDK_PATH="$4"
 
 echo "REMEMBER: cmake version should be 3.18.1, if yours is not go download that version from"
 echo "SDK Manager and then go to app/build.gradle, there in externalNativeBuild, inside cmake add ' version '3.18.1' '"
@@ -20,16 +21,28 @@ then
     exit 0
 fi
 
-if [ -z "$NDK_PATH" ]
+if [ -z "$SDK_PATH" ]
 then
-    echo "Third enter the path to ndk, ex: ~/Android/Sdk/ndk"
+    echo "Third enter the path to ndk, ex: ~/Android/Sdk"
     exit 0
 fi
 
-rm sdl/jni/GDE
-rm app/jni/GDE
+if [ -z "$NDK_PATH" ]
+then
+    echo "Fourth enter the path to ndk, ex: ~/Android/Sdk/ndk"
+    exit 0
+fi
+
+rm -f sdl/jni/GDE
+rm -f app/jni/GDE
 ln -s "$GDE_PATH" sdl/jni
 ln -s "$GDE_PATH" app/jni
+
+if ! grep -q "sdk.dir" gradle.properties; then
+  echo -e "\nsdk.dir=$SDK_PATH" >> gradle.properties
+fi
+
+
 # cd sdl/jni/ && ./buildAndroidLibs.sh "$GDE_ANDROID_PATH" "$NDK_PATH" "$BUILD_TYPE"
 
 echo "REMEMBER: cmake version should be 3.18.1, if yours is not go download that version from"

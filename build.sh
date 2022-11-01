@@ -1,9 +1,11 @@
 #!/bin/bash
 GDE_ANDROID_PATH="$1"
-NDK_PATH="$2"
-APP_HEADERS="$3"
-APP_SOURCES="$4"
-BUILD_TYPE="$5"
+GDE_PATH="$2"
+NDK_PATH="$3"
+APP_HEADERS="$4"
+APP_SOURCES="$5"
+APP_ASSETS="$6"
+BUILD_TYPE="$7"
 
 if [ -z "$GDE_ANDROID_PATH" ]
 then
@@ -11,27 +13,39 @@ then
     exit 0
 fi
 
+if [ -z "$GDE_PATH" ]
+then
+    echo "Second enter the path to GDE, ex: ~/Documents/GDE"
+    exit 0
+fi
+
 if [ -z "$NDK_PATH" ]
 then
-    echo "Second enter the path to NDK"
+    echo "Third enter the path to NDK"
     exit 0
 fi
 
 if [ -z "$APP_HEADERS" ]
 then
-    echo "Third enter the path to your app headers folder, ex: ~/Documents/MyApp/include"
+    echo "Fourth enter the path to your app headers folder, ex: ~/Documents/MyApp/include"
     exit 0
 fi
 
 if [ -z "$APP_SOURCES" ]
 then
-    echo "Fourth enter the path to your app sources folder, ex: ~/Documents/MyApp/src"
+    echo "Fifth enter the path to your app sources folder, ex: ~/Documents/MyApp/src"
+    exit 0
+fi
+
+if [ -z "$APP_ASSETS" ]
+then
+    echo "Sixth enter the path to your app assets folder, ex: ~/Documents/MyApp/assets"
     exit 0
 fi
 
 if [ -z "$BUILD_TYPE" ]
 then
-    echo "Fifth enter the build type, debug or release"
+    echo "Seventh enter the build type, debug or release"
     exit 0
 fi
 
@@ -50,6 +64,12 @@ then
   mkdir -p precompiledLibs-"$BUILD_TYPE"
   cp -r sdl/build/intermediates/ndkBuild/"$BUILD_TYPE"/lib precompiledLibs-"$BUILD_TYPE"
 fi
+
+rm -r -f app/src/main/assets/*
+echo "LINKED DEFAULT ASSETS"
+ln -s "$GDE_PATH"/defaultAssets app/src/main/assets/
+echo "LINKED APP ASSETS"
+ln -s "$APP_ASSETS" app/src/main/assets/
 
 echo "BUILDING APP FOR - $BUILD_TYPE -"
 if [ "$BUILD_TYPE" = "debug" ]
