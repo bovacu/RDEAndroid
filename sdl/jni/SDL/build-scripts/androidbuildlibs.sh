@@ -63,12 +63,13 @@ done
 # APP_* variables set in the environment here will not be seen by the
 # ndk-build makefile segments that use them, e.g., default-application.mk.
 # For consistency, pass all values on the command line.
+# x86_64 and x86 seem to be deprecated mostly (about 1% of the whole android phones)
 ndk-build \
   NDK_PROJECT_PATH=null \
   NDK_OUT=$obj \
   NDK_LIBS_OUT=$lib \
   APP_BUILD_SCRIPT=Android.mk \
-  APP_ABI="armeabi-v7a arm64-v8a x86 x86_64" \
+  APP_ABI="armeabi-v7a arm64-v8a" \
   APP_PLATFORM=android-16 \
   APP_MODULES="SDL2 SDL2_main" \
   $ndk_args
