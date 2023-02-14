@@ -21,9 +21,13 @@ arg_opt_app_name = "RDEAndroid_App"
 arg_opt_package_name = "com.example.android"
 arg_opt_app_icon = "ic_launcher_default"
 arg_opt_app_version = "1.0.0.0"
-arg_opt_app_orientations = "[portrait]"
+arg_opt_app_orientation = "portrait"
 arg_opt_clean = False
 arg_opt_install_after_build = False
+arg_opt_install_location = "internalOnly"
+arg_opt_is_game = False
+arg_opt_description = "No description."
+arg_opt_app_category = "game"
 
 def trace_to_string(trace):
     if " > /dev/null" in trace:
@@ -68,12 +72,18 @@ for arg in sys.argv:
         arg_opt_app_icon = arg.replace("--app_icon=", "")
     elif "--app_version" in arg:
         arg_opt_app_version = arg.replace("--app_version=", "")
-    elif "--app_orientations" in arg:
-        arg_opt_app_version = arg.replace("--app_orientations=", "")
+    elif "--app_orientation" in arg:
+        arg_opt_app_orientation = arg.replace("--app_orientation=", "")
     elif "--clean" in arg:
         arg_opt_clean = True
     elif "--install" in arg:
         arg_opt_install_after_build = True
+    elif "--app_category" in arg:
+        arg_opt_app_category = arg.replace("--app_category=", "")
+    elif "--device_install_location" in arg:
+        arg_opt_install_location = arg.replace("--device_install_location=", "")
+    elif "--description" in arg:
+        arg_opt_description = arg.replace("--description=", "")
     elif arg == "-h" or arg == "--help" or arg == "help":
         print("The script builds the project for Android, the following parameters are a must to be provided:")
         print("     --headers=<path/to/your/headers>")
@@ -93,10 +103,13 @@ for arg in sys.argv:
         print("     --force_rebuild Will rebuild all libraries if passed as parameter.")
         print("     --clean Will clean the project before compile.")
         print("     --install Will install the apk after compiling.")
+        print("     --device_install_location=<internalOnly,auto,preferExternal> Whether to install the app inside the phone, on an external drive or let the phone choose. By default internalOnly")
         print("     --app_name=<name of your app> Sets the name of the app (RDEAndroid_App by default)")
         print("     --app_icon=<path/to/icon/folder> To create the icons I recomend using https://icon.kitchen/ which will create the folder we need! Rename the downloaded folder as the name of the icon")
         print("     --app_version=<1.0.0.0> Must be in the this format, 4 numbers separated by dots.")
-        print("     --app_orientations=[<portrait,reverse_port,landscape,reverse_lands>] Any of the 4 versions (or combination) can be added.")
+        print("     --app_orientation=<portrait,reversePortrait,landscape,reverseLandscape> Any of the 4 versions can be added.")
+        print("     --app_category=<accessibility,audio,game,image,maps,news,productivity,social,vide> Set the type of application.")
+        print("     --description=<\"Your Description\"> App description readable for players.")
 
 if arg_must_project_headers == "":
     print("ERROR: parameter --headers must be provided, pointing to your .h,.hpp files.")
@@ -241,12 +254,35 @@ print("")
 print("")
 print("------------------- SETTING UP MANIFEST ----------------")
 android_manifest = minidom.parse('app/src/main/AndroidManifest.xml')
+strings = minidom.parse('app/src/main/res/values/strings.xml')
+
 manifest = android_manifest.getElementsByTagName("manifest")[0]
+application = android_manifest.getElementsByTagName("application")[0]
+activity = android_manifest.getElementsByTagName("activity")[0]
+
+string_values = strings.getElementsByTagName("string")
+for value in string_values:
+    if value.attributes["name"].value == "app_name":
+        value.firstChild.data = arg_opt_app_name
+        application.attributes["android:label"].value = "@string/" + value.attributes["name"].value
+        print(value.toxml())
+    elif value.attributes["name"].value == "app_description":
+        value.firstChild.data = arg_opt_description
+        application.attributes["android:description"].value = "@string/" + value.attributes["name"].value
+        print(value.toxml())
+
+with open('app/src/main/res/values/strings.xml', "w") as f:
+    f.write(strings.toxml())
+
+
+
 manifest.attributes["package"].value = arg_opt_package_name
 manifest.attributes["android:versionName"].value = arg_opt_app_version
+manifest.attributes["android:installLocation"].value = arg_opt_install_location
 
-application = android_manifest.getElementsByTagName("application")[0]
-application.attributes["android:label"].value = arg_opt_app_name
+application.attributes["android:appCategory"].value = arg_opt_app_category
+
+activity.attributes["android:screenOrientation"].value = arg_opt_app_orientation
 
 dir_path = "app/src/main/res/mipmap-anydpi-v26"
 if os.path.exists(dir_path) and os.path.isdir(dir_path):
@@ -279,10 +315,14 @@ application.attributes["android:icon"].value = "@mipmap/" + os.path.basename(os.
 with open("app/src/main/AndroidManifest.xml", "w") as f:
     f.write(android_manifest.toxml())
 
-print("Icon:    " + "@mipmap/" + os.path.basename(os.path.normpath(arg_opt_app_icon)))
-print("Package: " + arg_opt_package_name)
-print("Version: " + arg_opt_app_version)
-print("Name:    " + arg_opt_app_name)
+print("Icon:                " + "@mipmap/" + os.path.basename(os.path.normpath(arg_opt_app_icon)))
+print("Package:             " + arg_opt_package_name)
+print("Version:             " + arg_opt_app_version)
+print("Name:                " + arg_opt_app_name)
+print("App Category:        " + arg_opt_app_category)
+print("Install location:    " + arg_opt_install_location)
+print("Description:         " + arg_opt_description)
+print("Screen Orientation:  " + arg_opt_app_orientation)
 
 print("--------------------------------------------------------")
 print("")
