@@ -351,7 +351,7 @@ if arg_opt_install_after_build:
     for f in os.listdir(arg_rde_android_path + "/" + arg_opt_output_path):
         file_name, file_extension = os.path.splitext(f)
         if file_extension == ".apk":
-            so.system("adb install " + arg_opt_output_path + "/" + file_name + ".apk")
+            os.system("adb install " + arg_opt_output_path + "/" + file_name + ".apk")
             result_log(result, "Successfully Installed!")
     print("-----------------------------------------------------")
     print("")

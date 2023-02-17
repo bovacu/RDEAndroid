@@ -1,0 +1,1 @@
+python3 build.py --sources=/Users/macmini/Documents/RDE/editor --headers=/Users/macmini/Documents/RDE/editor --assets=/Users/macmini/Documents/RDE/assets --trace=full --android_ndk=/Users/macmini/Library/Android/sdk/ndk --android_sdk=/Users/macmini/Library/Android/sdk/ --build_type=release --install
