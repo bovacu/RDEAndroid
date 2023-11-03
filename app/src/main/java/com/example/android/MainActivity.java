@@ -12,17 +12,16 @@ public class MainActivity extends SDLActivity {
     protected String[] getLibraries() {
         return new String[]{
                 "SDL2",
-                "SDL2_mixer",
-                "SDL2_image",
                 "EGL",
-                "chipmunk",
+                "cglm",
                 "GLESv3",
-                "GDEAndroid"
+                "RDEAndroid"
         };
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+	    System.out.println("Entering on MainActivity onCreate");
         super.onCreate(savedInstanceState);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

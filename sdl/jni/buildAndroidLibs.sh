@@ -5,7 +5,7 @@ BUILD_TYPE="$3"
 
 if [ -z "$GDE_ANDROID_PATH" ]
 then
-    echo "First enter the path to GDEAndroid, ex: ~/Documents/GDEAndroid"
+    echo "First enter the path to RDEAndroid, ex: ~/Documents/RDEAndroid"
     exit 0
 fi
 

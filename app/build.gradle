@@ -1,7 +1,6 @@
 apply plugin: 'com.android.application'
 //FIREBASE_APPLY_GOOGLE_SERVICES
 
-
 android {
     buildToolsVersion engine.buildToolsVersion
     compileSdkVersion engine.compileSdkVersion
