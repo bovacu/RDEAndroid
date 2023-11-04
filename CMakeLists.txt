@@ -1,6 +1,6 @@
 #Android SDK path on windows is C:\Users\your_user\AppData\Local\Android\Sdk
 
-cmake_minimum_required(VERSION 3.18.1)
+cmake_minimum_required(VERSION 3.22.1)
 
 project(RDEAndroid)
 
