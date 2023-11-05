@@ -52,18 +52,18 @@ set_target_properties(
 # We will tell our build system where to look for third party header files.
 include_directories(${RDE_PATH}/external/include)
 include_directories(${RDE_PATH}/external/include/imgui)
-include_directories(${RDE_PATH}/external/include/SDL2)
 include_directories(${RDE_PATH}/engine/include)
 include_directories(sdl/jni/SDL/src/core/android)
+include_directories(sdl/jni/SDL/include)
 include_directories(sdl/jni/SDL/src)
 
-#set(IMGUI_SOURCES ${RDE_PATH}/external/include/imgui/imgui.cpp
-#		 		  ${RDE_PATH}/external/include/imgui/imgui_draw.cpp
-#				  ${RDE_PATH}/external/include/imgui/imgui_tables.cpp
-#				  ${RDE_PATH}/external/include/imgui/imgui_widgets.cpp
-#				  ${RDE_PATH}/external/include/imgui/backends/imgui_impl_android.cpp
-#				  ${RDE_PATH}/external/include/imgui/backends/imgui_impl_opengl3.cpp
-#		)
+set(IMGUI_SOURCES ${RDE_PATH}/external/include/imgui/imgui.cpp
+		 		  ${RDE_PATH}/external/include/imgui/imgui_draw.cpp
+				  ${RDE_PATH}/external/include/imgui/imgui_tables.cpp
+				  ${RDE_PATH}/external/include/imgui/imgui_widgets.cpp
+				  ${RDE_PATH}/external/include/imgui/backends/imgui_impl_android.cpp
+				  ${RDE_PATH}/external/include/imgui/backends/imgui_impl_opengl3.cpp
+		)
 
 set(APP_HEADERS )
 set(APP_SOURCES ${RDE_PATH}/examples/hub.cpp)
@@ -79,6 +79,9 @@ set(TARGET_LIBRARIES
         GLESv3
         EGL
 		cglm
+
+		# This one is needed or otherwise AXXX_FuncXXX won't work
+		android
     )
 
 #GDEFirebase
