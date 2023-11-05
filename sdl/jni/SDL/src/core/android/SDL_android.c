@@ -2484,6 +2484,11 @@ int SDL_AndroidShowToast(const char* message, int duration, int gravity, int xOf
     return Android_JNI_ShowToast(message, duration, gravity, xOffset, yOffset);
 }
 
+void* SDL_AndroidGetNativeWindow(void)
+{
+    return Android_JNI_GetNativeWindow();
+}
+
 void Android_JNI_GetManifestEnvironmentVariables(void)
 {
     if (!mActivityClass || !midGetManifestEnvironmentVariables) {

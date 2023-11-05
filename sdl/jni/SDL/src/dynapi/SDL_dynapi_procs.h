@@ -872,6 +872,7 @@ SDL_DYNAPI_PROC(int,SDL_isprint,(int a),(a),return)
 SDL_DYNAPI_PROC(int,SDL_isgraph,(int a),(a),return)
 #ifdef __ANDROID__
 SDL_DYNAPI_PROC(int,SDL_AndroidShowToast,(const char *a, int b, int c, int d, int e),(a,b,c,d,e),return)
+SDL_DYNAPI_PROC(void*,SDL_AndroidGetNativeWindow,(void),(),return)
 #endif
 SDL_DYNAPI_PROC(int,SDL_GetAudioDeviceSpec,(int a, int b, SDL_AudioSpec *c),(a,b,c),return)
 SDL_DYNAPI_PROC(void,SDL_TLSCleanup,(void),(),)

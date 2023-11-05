@@ -28,5 +28,5 @@ then
     NDK_BUILD_TYPE=0
 fi
 
-# This is REALLY IMPORTANT!! It builds the .so libs for SDL, SDL_Image, SDL_Mixer, Chipmunk (more if in future more libs are added), through their corresponding Android.mk
-"$NDK_PATH"/25.2.9519653/ndk-build APP_PLATFORM=android-21 NDK_DEBUG="$NDK_BUILD_TYPE" NDK_OUT="$GDE_ANDROID_PATH"/sdl/build/intermediates/ndkBuild/"$BUILD_TYPE"/object NDK_LIBS_OUT="$GDE_ANDROID_PATH"/sdl/build/intermediates/ndkBuild/"$BUILD_TYPE"/lib
+# This is REALLY IMPORTANT!! It builds the .so libs for SDL through its corresponding Android.mk
+"$NDK_PATH"/25.2.9519653/ndk-build APP_PLATFORM=android-21 NDK_DEBUG=0 NDK_OUT="$GDE_ANDROID_PATH"/sdl/build/intermediates/ndkBuild/"$BUILD_TYPE"/object NDK_LIBS_OUT="$GDE_ANDROID_PATH"/sdl/build/intermediates/ndkBuild/"$BUILD_TYPE"/lib
