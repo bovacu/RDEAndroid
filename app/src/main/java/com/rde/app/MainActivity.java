@@ -1,4 +1,4 @@
-package com.example.android;
+package com.rde.app;
 
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;

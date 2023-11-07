@@ -2,13 +2,13 @@ apply plugin: 'com.android.application'
 //FIREBASE_APPLY_GOOGLE_SERVICES
 
 android {
-    namespace "com.example.android"
+    namespace "com.rde.app"
     buildToolsVersion engine.buildToolsVersion
     compileSdkVersion engine.compileSdkVersion
     ndkVersion '25.2.9519653'
 
     defaultConfig {
-        applicationId "com.example.android"
+        applicationId "com.rde.app"
 
         minSdkVersion engine.minSdkVersion
         targetSdkVersion engine.targetSdkVersion
