@@ -15,7 +15,7 @@ public class MainActivity extends SDLActivity {
                 "EGL",
                 "cglm",
                 "GLESv3",
-                "RDEAndroid"
+                "RDEAndroidApp"
         };
     }
 

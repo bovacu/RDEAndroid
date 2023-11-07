@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.22.1)
 
-project(RDEAndroid)
+project(RDEAndroidApp)
 
 # Instruct our compiler that we want to use C++ 17 and use exceptions.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fexceptions")
@@ -22,6 +22,7 @@ add_compile_options(-DRDE_ERROR_MODULE)
 add_compile_options(-DRDE_FILE_SYSTEM_MODULE)
 add_compile_options(-DRDE_OBJ_MODULE)
 add_compile_options(-DRDE_PHYSICS_3D_MODULE)
+add_compile_options(-DRDE_IMGUI_MODULE)
 
 set(SDL_DIR "sdl/jni/SDL")
 
@@ -41,6 +42,7 @@ add_library(
 find_library(log-lib log)
 add_subdirectory(modules/cglm)
 
+# Set the target type of the SDL lib
 set_target_properties(
         sdl2
         PROPERTIES
@@ -49,7 +51,7 @@ set_target_properties(
 )
 
 
-# We will tell our build system where to look for third party header files.
+# Include all dependency paths of the engine
 include_directories(${RDE_PATH}/external/include)
 include_directories(${RDE_PATH}/external/include/imgui)
 include_directories(${RDE_PATH}/engine/include)
@@ -57,22 +59,22 @@ include_directories(sdl/jni/SDL/src/core/android)
 include_directories(sdl/jni/SDL/include)
 include_directories(sdl/jni/SDL/src)
 
+# Define all of the source files to be compiled
 set(IMGUI_SOURCES ${RDE_PATH}/external/include/imgui/imgui.cpp
 		 		  ${RDE_PATH}/external/include/imgui/imgui_draw.cpp
 				  ${RDE_PATH}/external/include/imgui/imgui_tables.cpp
 				  ${RDE_PATH}/external/include/imgui/imgui_widgets.cpp
-				  ${RDE_PATH}/external/include/imgui/backends/imgui_impl_android.cpp
+				  ${RDE_PATH}/external/include/imgui/backends/imgui_impl_sdl2.cpp
 				  ${RDE_PATH}/external/include/imgui/backends/imgui_impl_opengl3.cpp
+				  ${RDE_PATH}/external/include/imgui/rde_imgui.cpp
 		)
-
-set(APP_HEADERS )
-set(APP_SOURCES ${RDE_PATH}/examples/hub.cpp)
 file(GLOB_RECURSE CPP_SOURCES ${RDE_PATH}/external/include/Jolt/*.cpp 
 							  ${RDE_PATH}/external/include/JoltC/*.cpp  
 							  ${RDE_PATH}/engine/src/rde.c)
 
 set(GL_PROFILES "GL_PROFILE_GLES2" "GL_PROFILE_GLES3")
 
+# Include all of the engine's libs dependencies
 set(TARGET_LIBRARIES
         sdl2
         ${log-lib}
@@ -85,21 +87,25 @@ set(TARGET_LIBRARIES
     )
 
 #GDEFirebase
-
+# Generate the engine lib
 add_library(RDEAndroid
             SHARED
-            ${CPP_HEADERS}
             ${CPP_SOURCES}
-
 			${IMGUI_SOURCES}
-
-			${APP_HEADERS}
-            ${APP_SOURCES}
 )
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-# Finally, we need to link all the libraries we want to use in our project together, remembering that the 'a-simple-triangle' library is in fact our own C++ code. Note also we are including the 'GLESv2' library for OpenGL ES2 support, though we don't need to define it ourselves with the 'add_library' commands.
 target_link_libraries(RDEAndroid ${TARGET_LIBRARIES})
 
-target_compile_definitions(RDEAndroid PRIVATE ${GL_PROFILES})
+# Define all app's source files
+set(APP_SOURCES ${RDE_PATH}/examples/hub.c)
+
+# Create application main lib. Yes, the "executable" of the APK is a lib containing a int main(...) { ... }
+add_library(RDEAndroidApp
+		SHARED
+		${APP_SOURCES}
+)
+
+# Finally we export the final library, which contains the application code + RDE's lib.
+target_link_libraries(RDEAndroidApp RDEAndroid)
+target_compile_definitions(RDEAndroidApp PRIVATE ${GL_PROFILES})
