@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2022 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -265,8 +265,13 @@ SDL_SendTouch(SDL_TouchID id, SDL_FingerID fingerid, SDL_Window * window,
 
 #if SYNTHESIZE_TOUCH_TO_MOUSE
     /* SDL_HINT_TOUCH_MOUSE_EVENTS: controlling whether touch events should generate synthetic mouse events */
+    /* SDL_HINT_VITA_TOUCH_MOUSE_DEVICE: controlling which touchpad should generate synthetic mouse events, PSVita-only */
     {
+#if defined(__vita__)
+        if (mouse->touch_mouse_events && ((mouse->vita_touch_mouse_device == id) || (mouse->vita_touch_mouse_device == 2)) ) {
+#else
         if (mouse->touch_mouse_events) {
+#endif
             /* FIXME: maybe we should only restrict to a few SDL_TouchDeviceType */
             if (id != SDL_MOUSE_TOUCHID) {
                 if (window) {
@@ -451,10 +456,16 @@ SDL_SendTouchMotion(SDL_TouchID id, SDL_FingerID fingerid, SDL_Window * window,
 void
 SDL_DelTouch(SDL_TouchID id)
 {
-    int i;
-    int index = SDL_GetTouchIndex(id);
-    SDL_Touch *touch = SDL_GetTouch(id);
+    int i, index;
+    SDL_Touch *touch;
 
+    if (SDL_num_touch == 0) {
+        /* We've already cleaned up, we won't find this device */
+        return;
+    }
+
+    index = SDL_GetTouchIndex(id);
+    touch = SDL_GetTouch(id);
     if (!touch) {
         return;
     }

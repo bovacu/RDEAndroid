@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2022 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -255,7 +255,7 @@ SW_QueueCopy(SDL_Renderer * renderer, SDL_RenderCommand *cmd, SDL_Texture * text
 
     cmd->data.draw.count = 1;
 
-    SDL_memcpy(verts, srcrect, sizeof (SDL_Rect));
+    SDL_copyp(verts, srcrect);
     verts++;
 
     verts->x = (int)dstrect->x;
@@ -290,14 +290,14 @@ SW_QueueCopyEx(SDL_Renderer * renderer, SDL_RenderCommand *cmd, SDL_Texture * te
 
     cmd->data.draw.count = 1;
 
-    SDL_memcpy(&verts->srcrect, srcrect, sizeof (SDL_Rect));
+    SDL_copyp(&verts->srcrect, srcrect);
 
     verts->dstrect.x = (int)dstrect->x;
     verts->dstrect.y = (int)dstrect->y;
     verts->dstrect.w = (int)dstrect->w;
     verts->dstrect.h = (int)dstrect->h;
     verts->angle = angle;
-    SDL_memcpy(&verts->center, center, sizeof (SDL_FPoint));
+    SDL_copyp(&verts->center, center);
     verts->flip = flip;
     verts->scale_x = scale_x;
     verts->scale_y = scale_y;
@@ -435,59 +435,32 @@ SW_RenderCopyEx(SDL_Renderer * renderer, SDL_Surface *surface, SDL_Texture * tex
     SDL_SetSurfaceBlendMode(src_clone, blendmode);
 
     if (!retval) {
-        int dstwidth, dstheight;
+        SDL_Rect rect_dest;
         double cangle, sangle;
 
-        SDLgfx_rotozoomSurfaceSizeTrig(tmp_rect.w, tmp_rect.h, angle, &dstwidth, &dstheight, &cangle, &sangle);
-        src_rotated = SDLgfx_rotateSurface(src_clone, angle, dstwidth/2, dstheight/2, (texture->scaleMode == SDL_ScaleModeNearest) ? 0 : 1, flip & SDL_FLIP_HORIZONTAL, flip & SDL_FLIP_VERTICAL, dstwidth, dstheight, cangle, sangle);
+        SDLgfx_rotozoomSurfaceSizeTrig(tmp_rect.w, tmp_rect.h, angle, center,
+                &rect_dest, &cangle, &sangle);
+        src_rotated = SDLgfx_rotateSurface(src_clone, angle,
+                (texture->scaleMode == SDL_ScaleModeNearest) ? 0 : 1, flip & SDL_FLIP_HORIZONTAL, flip & SDL_FLIP_VERTICAL,
+                &rect_dest, cangle, sangle, center);
         if (src_rotated == NULL) {
             retval = -1;
         }
         if (!retval && mask != NULL) {
             /* The mask needed for the NONE blend mode gets rotated with the same parameters. */
-            mask_rotated = SDLgfx_rotateSurface(mask, angle, dstwidth/2, dstheight/2, SDL_FALSE, 0, 0, dstwidth, dstheight, cangle, sangle);
+            mask_rotated = SDLgfx_rotateSurface(mask, angle,
+                    SDL_FALSE, 0, 0,
+                    &rect_dest, cangle, sangle, center);
             if (mask_rotated == NULL) {
                 retval = -1;
             }
         }
         if (!retval) {
-            double abscenterx, abscentery;
-            double px, py, p1x, p1y, p2x, p2y, p3x, p3y, p4x, p4y;
 
-            /* Find out where the new origin is by rotating the four final_rect points around the center and then taking the extremes */
-            abscenterx = final_rect->x + center->x;
-            abscentery = final_rect->y + center->y;
-            /* Compensate the angle inversion to match the behaviour of the other backends */
-            sangle = -sangle;
-
-            /* Top Left */
-            px = final_rect->x - abscenterx;
-            py = final_rect->y - abscentery;
-            p1x = px * cangle - py * sangle + abscenterx;
-            p1y = px * sangle + py * cangle + abscentery;
-
-            /* Top Right */
-            px = final_rect->x + final_rect->w - abscenterx;
-            py = final_rect->y - abscentery;
-            p2x = px * cangle - py * sangle + abscenterx;
-            p2y = px * sangle + py * cangle + abscentery;
-
-            /* Bottom Left */
-            px = final_rect->x - abscenterx;
-            py = final_rect->y + final_rect->h - abscentery;
-            p3x = px * cangle - py * sangle + abscenterx;
-            p3y = px * sangle + py * cangle + abscentery;
-
-            /* Bottom Right */
-            px = final_rect->x + final_rect->w - abscenterx;
-            py = final_rect->y + final_rect->h - abscentery;
-            p4x = px * cangle - py * sangle + abscenterx;
-            p4y = px * sangle + py * cangle + abscentery;
-
-            tmp_rect.x = (int)MIN(MIN(p1x, p2x), MIN(p3x, p4x));
-            tmp_rect.y = (int)MIN(MIN(p1y, p2y), MIN(p3y, p4y));
-            tmp_rect.w = dstwidth;
-            tmp_rect.h = dstheight;
+            tmp_rect.x = final_rect->x + rect_dest.x;
+            tmp_rect.y = final_rect->y + rect_dest.y;
+            tmp_rect.w = rect_dest.w;
+            tmp_rect.h = rect_dest.h;
 
             /* The NONE blend mode needs some special care with non-opaque surfaces.
              * Other blend modes or opaque surfaces can be blitted directly.
@@ -760,7 +733,7 @@ SW_RunCommandQueue(SDL_Renderer * renderer, SDL_RenderCommand *cmd, void *vertic
                 SetDrawState(surface, &drawstate);
 
                 /* Apply viewport */
-                if (drawstate.viewport->x || drawstate.viewport->y) {
+                if (drawstate.viewport != NULL && (drawstate.viewport->x || drawstate.viewport->y)) {
                     int i;
                     for (i = 0; i < count; i++) {
                         verts[i].x += drawstate.viewport->x;
@@ -787,7 +760,7 @@ SW_RunCommandQueue(SDL_Renderer * renderer, SDL_RenderCommand *cmd, void *vertic
                 SetDrawState(surface, &drawstate);
 
                 /* Apply viewport */
-                if (drawstate.viewport->x || drawstate.viewport->y) {
+                if (drawstate.viewport != NULL && (drawstate.viewport->x || drawstate.viewport->y)) {
                     int i;
                     for (i = 0; i < count; i++) {
                         verts[i].x += drawstate.viewport->x;
@@ -814,7 +787,7 @@ SW_RunCommandQueue(SDL_Renderer * renderer, SDL_RenderCommand *cmd, void *vertic
                 SetDrawState(surface, &drawstate);
 
                 /* Apply viewport */
-                if (drawstate.viewport->x || drawstate.viewport->y) {
+                if (drawstate.viewport != NULL && (drawstate.viewport->x || drawstate.viewport->y)) {
                     int i;
                     for (i = 0; i < count; i++) {
                         verts[i].x += drawstate.viewport->x;
@@ -842,7 +815,7 @@ SW_RunCommandQueue(SDL_Renderer * renderer, SDL_RenderCommand *cmd, void *vertic
                 PrepTextureForCopy(cmd);
 
                 /* Apply viewport */
-                if (drawstate.viewport->x || drawstate.viewport->y) {
+                if (drawstate.viewport != NULL && (drawstate.viewport->x || drawstate.viewport->y)) {
                     dstrect->x += drawstate.viewport->x;
                     dstrect->y += drawstate.viewport->y;
                 }
@@ -900,7 +873,7 @@ SW_RunCommandQueue(SDL_Renderer * renderer, SDL_RenderCommand *cmd, void *vertic
                 PrepTextureForCopy(cmd);
 
                 /* Apply viewport */
-                if (drawstate.viewport->x || drawstate.viewport->y) {
+                if (drawstate.viewport != NULL && (drawstate.viewport->x || drawstate.viewport->y)) {
                     copydata->dstrect.x += drawstate.viewport->x;
                     copydata->dstrect.y += drawstate.viewport->y;
                 }
@@ -928,7 +901,7 @@ SW_RunCommandQueue(SDL_Renderer * renderer, SDL_RenderCommand *cmd, void *vertic
                     PrepTextureForCopy(cmd);
 
                     /* Apply viewport */
-                    if (drawstate.viewport->x || drawstate.viewport->y) {
+                    if (drawstate.viewport != NULL && (drawstate.viewport->x || drawstate.viewport->y)) {
                         SDL_Point vp;
                         vp.x = drawstate.viewport->x;
                         vp.y = drawstate.viewport->y;
@@ -951,7 +924,7 @@ SW_RunCommandQueue(SDL_Renderer * renderer, SDL_RenderCommand *cmd, void *vertic
                     GeometryFillData *ptr = (GeometryFillData *) verts;
 
                     /* Apply viewport */
-                    if (drawstate.viewport->x || drawstate.viewport->y) {
+                    if (drawstate.viewport != NULL && (drawstate.viewport->x || drawstate.viewport->y)) {
                         SDL_Point vp;
                         vp.x = drawstate.viewport->x;
                         vp.y = drawstate.viewport->y;
@@ -1010,14 +983,15 @@ SW_RenderReadPixels(SDL_Renderer * renderer, const SDL_Rect * rect,
                              format, pixels, pitch);
 }
 
-static void
+static int
 SW_RenderPresent(SDL_Renderer * renderer)
 {
     SDL_Window *window = renderer->window;
 
-    if (window) {
-        SDL_UpdateWindowSurface(window);
+    if (!window) {
+        return -1;
     }
+    return SDL_UpdateWindowSurface(window);
 }
 
 static void

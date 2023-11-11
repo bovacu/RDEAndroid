@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2022 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -56,12 +56,12 @@ SDL_CreateMutex(void)
 void
 SDL_DestroyMutex(SDL_mutex * mutex)
 {
-    ULONG ulRC;
     HMTX  hMtx = (HMTX)mutex;
-
-    ulRC = DosCloseMutexSem(hMtx);
-    if (ulRC != NO_ERROR) {
-        debug_os2("DosCloseMutexSem(), rc = %u", ulRC);
+    if (hMtx != NULLHANDLE) {
+        const ULONG ulRC = DosCloseMutexSem(hMtx);
+        if (ulRC != NO_ERROR) {
+            debug_os2("DosCloseMutexSem(), rc = %u", ulRC);
+        }
     }
 }
 

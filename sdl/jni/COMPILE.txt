@@ -1,0 +1,5 @@
+Windows:
+{YOUR_PATH_TO_NDK_INCLUDING_NKD_FOLDER}\25.2.9519653\ndk-build APP_PLATFORM=android-28 NDK_DEBUG=0 NDK_OUT={YOUR_PATH_TO_RDEANDROID}\sdl\build\intermediates\ndkBuild\release\object NDK_LIBS_OUT={YOUR_PATH_TO_RDEANDROID}\sdl\build\intermediates\ndkBuild\release\lib
+
+Linux & Mac
+{YOUR_PATH_TO_NDK_INCLUDING_NKD_FOLDER}/25.2.9519653/ndk-build APP_PLATFORM=android-28 NDK_DEBUG=0 NDK_OUT={YOUR_PATH_TO_RDEANDROID}/sdl/build/intermediates/ndkBuild/release/object NDK_LIBS_OUT={YOUR_PATH_TO_RDEANDROID}/sdl/build/intermediates/ndkBuild/release/lib
