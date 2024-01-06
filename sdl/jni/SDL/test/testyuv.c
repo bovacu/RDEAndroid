@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -9,41 +9,35 @@
   including commercial applications, and to alter it and redistribute it
   freely.
 */
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
-#include "SDL.h"
-#include "SDL_test_font.h"
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+#include <SDL3/SDL_test.h>
 #include "testyuv_cvt.h"
-
+#include "testutils.h"
 
 /* 422 (YUY2, etc) formats are the largest */
-#define MAX_YUV_SURFACE_SIZE(W, H, P)  (H*4*(W+P+1)/2)
-
+#define MAX_YUV_SURFACE_SIZE(W, H, P) (H * 4 * (W + P + 1) / 2)
 
 /* Return true if the YUV format is packed pixels */
 static SDL_bool is_packed_yuv_format(Uint32 format)
 {
-    return (format == SDL_PIXELFORMAT_YUY2 ||
-            format == SDL_PIXELFORMAT_UYVY ||
-            format == SDL_PIXELFORMAT_YVYU);
+    return format == SDL_PIXELFORMAT_YUY2 || format == SDL_PIXELFORMAT_UYVY || format == SDL_PIXELFORMAT_YVYU;
 }
 
 /* Create a surface with a good pattern for verifying YUV conversion */
 static SDL_Surface *generate_test_pattern(int pattern_size)
 {
-    SDL_Surface *pattern = SDL_CreateRGBSurfaceWithFormat(0, pattern_size, pattern_size, 0, SDL_PIXELFORMAT_RGB24);
+    SDL_Surface *pattern = SDL_CreateSurface(pattern_size, pattern_size, SDL_PIXELFORMAT_RGB24);
 
     if (pattern) {
         int i, x, y;
         Uint8 *p, c;
-        const int thickness = 2;    /* Important so 2x2 blocks of color are the same, to avoid Cr/Cb interpolation over pixels */
+        const int thickness = 2; /* Important so 2x2 blocks of color are the same, to avoid Cr/Cb interpolation over pixels */
 
         /* R, G, B in alternating horizontal bands */
-        for (y = 0; y < pattern->h; y += thickness) {
+        for (y = 0; y < pattern->h - (thickness - 1); y += thickness) {
             for (i = 0; i < thickness; ++i) {
-                p = (Uint8 *)pattern->pixels + (y + i) * pattern->pitch + ((y/thickness) % 3);
+                p = (Uint8 *)pattern->pixels + (y + i) * pattern->pitch + ((y / thickness) % 3);
                 for (x = 0; x < pattern->w; ++x) {
                     *p = 0xFF;
                     p += 3;
@@ -53,9 +47,9 @@ static SDL_Surface *generate_test_pattern(int pattern_size)
 
         /* Black and white in alternating vertical bands */
         c = 0xFF;
-        for (x = 1*thickness; x < pattern->w; x += 2*thickness) {
+        for (x = 1 * thickness; x < pattern->w; x += 2 * thickness) {
             for (i = 0; i < thickness; ++i) {
-                p = (Uint8 *)pattern->pixels + (x + i)*3;
+                p = (Uint8 *)pattern->pixels + (x + i) * 3;
                 for (y = 0; y < pattern->h; ++y) {
                     SDL_memset(p, c, 3);
                     p += pattern->pitch;
@@ -129,7 +123,7 @@ static int run_automated_tests(int pattern_size, int extra_pitch)
     Uint8 *yuv2 = (Uint8 *)SDL_malloc(yuv_len);
     int yuv1_pitch, yuv2_pitch;
     int result = -1;
-    
+
     if (!pattern || !yuv1 || !yuv2) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't allocate test surfaces");
         goto done;
@@ -206,20 +200,19 @@ static int run_automated_tests(int pattern_size, int extra_pitch)
         }
     }
 
-
     result = 0;
 
 done:
     SDL_free(yuv1);
     SDL_free(yuv2);
-    SDL_FreeSurface(pattern);
+    SDL_DestroySurface(pattern);
     return result;
 }
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
-    struct {
+    struct
+    {
         SDL_bool enable_intrinsics;
         int pattern_size;
         int extra_pitch;
@@ -247,10 +240,10 @@ main(int argc, char **argv)
         { SDL_TRUE, 33, 3 },
         { SDL_TRUE, 37, 3 },
     };
-    int arg = 1;
-    const char *filename;
+    char *filename = NULL;
     SDL_Surface *original;
     SDL_Surface *converted;
+    SDL_Surface *bmp;
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Texture *output[3];
@@ -263,62 +256,111 @@ main(int argc, char **argv)
     int current = 0;
     int pitch;
     Uint8 *raw_yuv;
-    Uint32 then, now, i, iterations = 100;
+    Uint64 then, now;
+    int i, iterations = 100;
     SDL_bool should_run_automated_tests = SDL_FALSE;
+    SDLTest_CommonState *state;
 
-    while (argv[arg] && *argv[arg] == '-') {
-        if (SDL_strcmp(argv[arg], "--jpeg") == 0) {
-            SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_JPEG);
-        } else if (SDL_strcmp(argv[arg], "--bt601") == 0) {
-            SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_BT601);
-        } else if (SDL_strcmp(argv[arg], "--bt709") == 0) {
-            SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_BT709);
-        } else if (SDL_strcmp(argv[arg], "--auto") == 0) {
-            SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_AUTOMATIC);
-        } else if (SDL_strcmp(argv[arg], "--yv12") == 0) {
-            yuv_format = SDL_PIXELFORMAT_YV12;
-        } else if (SDL_strcmp(argv[arg], "--iyuv") == 0) {
-            yuv_format = SDL_PIXELFORMAT_IYUV;
-        } else if (SDL_strcmp(argv[arg], "--yuy2") == 0) {
-            yuv_format = SDL_PIXELFORMAT_YUY2;
-        } else if (SDL_strcmp(argv[arg], "--uyvy") == 0) {
-            yuv_format = SDL_PIXELFORMAT_UYVY;
-        } else if (SDL_strcmp(argv[arg], "--yvyu") == 0) {
-            yuv_format = SDL_PIXELFORMAT_YVYU;
-        } else if (SDL_strcmp(argv[arg], "--nv12") == 0) {
-            yuv_format = SDL_PIXELFORMAT_NV12;
-        } else if (SDL_strcmp(argv[arg], "--nv21") == 0) {
-            yuv_format = SDL_PIXELFORMAT_NV21;
-        } else if (SDL_strcmp(argv[arg], "--rgb555") == 0) {
-            rgb_format = SDL_PIXELFORMAT_RGB555;
-        } else if (SDL_strcmp(argv[arg], "--rgb565") == 0) {
-            rgb_format = SDL_PIXELFORMAT_RGB565;
-        } else if (SDL_strcmp(argv[arg], "--rgb24") == 0) {
-            rgb_format = SDL_PIXELFORMAT_RGB24;
-        } else if (SDL_strcmp(argv[arg], "--argb") == 0) {
-            rgb_format = SDL_PIXELFORMAT_ARGB8888;
-        } else if (SDL_strcmp(argv[arg], "--abgr") == 0) {
-            rgb_format = SDL_PIXELFORMAT_ABGR8888;
-        } else if (SDL_strcmp(argv[arg], "--rgba") == 0) {
-            rgb_format = SDL_PIXELFORMAT_RGBA8888;
-        } else if (SDL_strcmp(argv[arg], "--bgra") == 0) {
-            rgb_format = SDL_PIXELFORMAT_BGRA8888;
-        } else if (SDL_strcmp(argv[arg], "--automated") == 0) {
-            should_run_automated_tests = SDL_TRUE;
-        } else {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Usage: %s [--jpeg|--bt601|-bt709|--auto] [--yv12|--iyuv|--yuy2|--uyvy|--yvyu|--nv12|--nv21] [--rgb555|--rgb565|--rgb24|--argb|--abgr|--rgba|--bgra] [image_filename]\n", argv[0]);
+    /* Initialize test framework */
+    state = SDLTest_CommonCreateState(argv, 0);
+    if (!state) {
+        return 1;
+    }
+
+    /* Enable standard application logging */
+    SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
+
+    /* Parse commandline */
+    for (i = 1; i < argc;) {
+        int consumed;
+
+        consumed = SDLTest_CommonArg(state, i);
+        if (!consumed) {
+            if (SDL_strcmp(argv[i], "--jpeg") == 0) {
+                SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_JPEG);
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--bt601") == 0) {
+                SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_BT601);
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--bt709") == 0) {
+                SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_BT709);
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--auto") == 0) {
+                SDL_SetYUVConversionMode(SDL_YUV_CONVERSION_AUTOMATIC);
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--yv12") == 0) {
+                yuv_format = SDL_PIXELFORMAT_YV12;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--iyuv") == 0) {
+                yuv_format = SDL_PIXELFORMAT_IYUV;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--yuy2") == 0) {
+                yuv_format = SDL_PIXELFORMAT_YUY2;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--uyvy") == 0) {
+                yuv_format = SDL_PIXELFORMAT_UYVY;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--yvyu") == 0) {
+                yuv_format = SDL_PIXELFORMAT_YVYU;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--nv12") == 0) {
+                yuv_format = SDL_PIXELFORMAT_NV12;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--nv21") == 0) {
+                yuv_format = SDL_PIXELFORMAT_NV21;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--rgb555") == 0) {
+                rgb_format = SDL_PIXELFORMAT_RGB555;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--rgb565") == 0) {
+                rgb_format = SDL_PIXELFORMAT_RGB565;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--rgb24") == 0) {
+                rgb_format = SDL_PIXELFORMAT_RGB24;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--argb") == 0) {
+                rgb_format = SDL_PIXELFORMAT_ARGB8888;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--abgr") == 0) {
+                rgb_format = SDL_PIXELFORMAT_ABGR8888;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--rgba") == 0) {
+                rgb_format = SDL_PIXELFORMAT_RGBA8888;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--bgra") == 0) {
+                rgb_format = SDL_PIXELFORMAT_BGRA8888;
+                consumed = 1;
+            } else if (SDL_strcmp(argv[i], "--automated") == 0) {
+                should_run_automated_tests = SDL_TRUE;
+                consumed = 1;
+            } else if (!filename) {
+                filename = argv[i];
+                consumed = 1;
+            }
+        }
+        if (consumed <= 0) {
+            static const char *options[] = {
+                "[--jpeg|--bt601|-bt709|--auto]",
+                "[--yv12|--iyuv|--yuy2|--uyvy|--yvyu|--nv12|--nv21]",
+                "[--rgb555|--rgb565|--rgb24|--argb|--abgr|--rgba|--bgra]",
+                "[--automated]",
+                "[sample.bmp]",
+                NULL,
+            };
+            SDLTest_CommonLogUsage(state, argv[0], options);
+            SDLTest_CommonDestroyState(state);
             return 1;
         }
-        ++arg;
+        i += consumed;
     }
 
     /* Run automated tests */
     if (should_run_automated_tests) {
-        for (i = 0; i < SDL_arraysize(automated_test_params); ++i) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Running automated test, pattern size %d, extra pitch %d, intrinsics %s\n", 
-                automated_test_params[i].pattern_size,
-                automated_test_params[i].extra_pitch,
-                automated_test_params[i].enable_intrinsics ? "enabled" : "disabled");
+        for (i = 0; i < (int)SDL_arraysize(automated_test_params); ++i) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Running automated test, pattern size %d, extra pitch %d, intrinsics %s\n",
+                        automated_test_params[i].pattern_size,
+                        automated_test_params[i].extra_pitch,
+                        automated_test_params[i].enable_intrinsics ? "enabled" : "disabled");
             if (run_automated_tests(automated_test_params[i].pattern_size, automated_test_params[i].extra_pitch) < 0) {
                 return 2;
             }
@@ -326,12 +368,10 @@ main(int argc, char **argv)
         return 0;
     }
 
-    if (argv[arg]) {
-        filename = argv[arg];
-    } else {
-        filename = "testyuv.bmp";
-    }
-    original = SDL_ConvertSurfaceFormat(SDL_LoadBMP(filename), SDL_PIXELFORMAT_RGB24, 0);
+    filename = GetResourceFilename(filename, "testyuv.bmp");
+    bmp = SDL_LoadBMP(filename);
+    original = SDL_ConvertSurfaceFormat(bmp, SDL_PIXELFORMAT_RGB24);
+    SDL_DestroySurface(bmp);
     if (!original) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't load %s: %s\n", filename, SDL_GetError());
         return 3;
@@ -339,34 +379,30 @@ main(int argc, char **argv)
 
     raw_yuv = SDL_calloc(1, MAX_YUV_SURFACE_SIZE(original->w, original->h, 0));
     ConvertRGBtoYUV(yuv_format, original->pixels, original->pitch, raw_yuv, original->w, original->h,
-        SDL_GetYUVConversionModeForResolution(original->w, original->h),
-        0, 100);
+                    SDL_GetYUVConversionModeForResolution(original->w, original->h),
+                    0, 100);
     pitch = CalculateYUVPitch(yuv_format, original->w);
 
-    converted = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 0, rgb_format);
+    converted = SDL_CreateSurface(original->w, original->h, rgb_format);
     if (!converted) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create converted surface: %s\n", SDL_GetError());
         return 3;
     }
 
     then = SDL_GetTicks();
-    for ( i = 0; i < iterations; ++i ) {
+    for (i = 0; i < iterations; ++i) {
         SDL_ConvertPixels(original->w, original->h, yuv_format, raw_yuv, pitch, rgb_format, converted->pixels, converted->pitch);
     }
     now = SDL_GetTicks();
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "%" SDL_PRIu32 " iterations in %" SDL_PRIu32 " ms, %.2fms each\n", iterations, (now - then), (float) (now - then) / iterations);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "%d iterations in %" SDL_PRIu64 " ms, %.2fms each\n", iterations, (now - then), (float)(now - then) / iterations);
 
-    window = SDL_CreateWindow("YUV test",
-                              SDL_WINDOWPOS_UNDEFINED,
-                              SDL_WINDOWPOS_UNDEFINED,
-                              original->w, original->h,
-                              0);
+    window = SDL_CreateWindow("YUV test", original->w, original->h, 0);
     if (!window) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s\n", SDL_GetError());
         return 4;
     }
 
-    renderer = SDL_CreateRenderer(window, -1, 0);
+    renderer = SDL_CreateRenderer(window, NULL, 0);
     if (!renderer) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create renderer: %s\n", SDL_GetError());
         return 4;
@@ -380,7 +416,7 @@ main(int argc, char **argv)
         return 5;
     }
     SDL_UpdateTexture(output[2], NULL, raw_yuv, pitch);
-    
+
     yuv_name = SDL_GetPixelFormatName(yuv_format);
     if (SDL_strncmp(yuv_name, "SDL_PIXELFORMAT_", 16) == 0) {
         yuv_name += 16;
@@ -401,15 +437,15 @@ main(int argc, char **argv)
         break;
     }
 
-    { int done = 0;
-        while ( !done )
-        {
+    {
+        int done = 0;
+        while (!done) {
             SDL_Event event;
             while (SDL_PollEvent(&event) > 0) {
-                if (event.type == SDL_QUIT) {
+                if (event.type == SDL_EVENT_QUIT) {
                     done = 1;
                 }
-                if (event.type == SDL_KEYDOWN) {
+                if (event.type == SDL_EVENT_KEY_DOWN) {
                     if (event.key.keysym.sym == SDLK_ESCAPE) {
                         done = 1;
                     } else if (event.key.keysym.sym == SDLK_LEFT) {
@@ -418,8 +454,8 @@ main(int argc, char **argv)
                         ++current;
                     }
                 }
-                if (event.type == SDL_MOUSEBUTTONDOWN) {
-                    if (event.button.x < (original->w/2)) {
+                if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                    if (event.button.x < (original->w / 2)) {
                         --current;
                     } else {
                         ++current;
@@ -436,20 +472,26 @@ main(int argc, char **argv)
             }
 
             SDL_RenderClear(renderer);
-            SDL_RenderCopy(renderer, output[current], NULL, NULL);
+            SDL_RenderTexture(renderer, output[current], NULL, NULL);
             SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
             if (current == 0) {
                 SDLTest_DrawString(renderer, 4, 4, titles[current]);
             } else {
-                SDL_snprintf(title, sizeof(title), "%s %s %s", titles[current], yuv_name, yuv_mode);
+                (void)SDL_snprintf(title, sizeof(title), "%s %s %s", titles[current], yuv_name, yuv_mode);
                 SDLTest_DrawString(renderer, 4, 4, title);
             }
             SDL_RenderPresent(renderer);
             SDL_Delay(10);
         }
     }
+    SDL_free(raw_yuv);
+    SDL_free(filename);
+    SDL_DestroySurface(original);
+    SDL_DestroySurface(converted);
+    SDLTest_CleanupTextDrawing();
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
     SDL_Quit();
+    SDLTest_CommonDestroyState(state);
     return 0;
 }
-
-/* vi: set ts=4 sw=4 expandtab: */

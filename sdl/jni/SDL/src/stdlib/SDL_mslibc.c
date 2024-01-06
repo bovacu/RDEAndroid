@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,12 +18,7 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-
-#if defined(__clang_analyzer__) && !defined(SDL_DISABLE_ANALYZE_MACROS)
-#define SDL_DISABLE_ANALYZE_MACROS 1
-#endif
-
-#include "../SDL_internal.h"
+#include "SDL_internal.h"
 
 /* This file contains SDL replacements for functions in the C library */
 
@@ -31,7 +26,7 @@
 
 /* These are some C runtime intrinsics that need to be defined */
 
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 
 #ifndef __FLTUSED__
 #define __FLTUSED__
@@ -39,28 +34,34 @@ __declspec(selectany) int _fltused = 1;
 #endif
 
 /* The optimizer on Visual Studio 2005 and later generates memcpy() and memset() calls.
-   Always provide it for the SDL2 DLL, but skip it when building static lib w/ static runtime. */
+   Always provide it for the SDL3 DLL, but skip it when building static lib w/ static runtime. */
 #if (_MSC_VER >= 1400) && (!defined(_MT) || defined(DLL_EXPORT))
-extern void *memcpy(void* dst, const void* src, size_t len);
+/* NOLINTNEXTLINE(readability-redundant-declaration) */
+extern void *memcpy(void *dst, const void *src, size_t len);
+#ifndef __INTEL_LLVM_COMPILER
 #pragma intrinsic(memcpy)
+#endif
 
-#if !defined(__clang__)
+#ifndef __clang__
 #pragma function(memcpy)
 #endif
-void *
-memcpy(void *dst, const void *src, size_t len)
+/* NOLINTNEXTLINE(readability-inconsistent-declaration-parameter-name) */
+void *memcpy(void *dst, const void *src, size_t len)
 {
     return SDL_memcpy(dst, src, len);
 }
 
-extern void *memset(void* dst, int c, size_t len);
+/* NOLINTNEXTLINE(readability-redundant-declaration) */
+extern void *memset(void *dst, int c, size_t len);
+#ifndef __INTEL_LLVM_COMPILER
 #pragma intrinsic(memset)
+#endif
 
-#if !defined(__clang__)
+#ifndef __clang__
 #pragma function(memset)
 #endif
-void *
-memset(void *dst, int c, size_t len)
+/* NOLINTNEXTLINE(readability-inconsistent-declaration-parameter-name) */
+void *memset(void *dst, int c, size_t len)
 {
     return SDL_memset(dst, c, len);
 }
@@ -69,9 +70,7 @@ memset(void *dst, int c, size_t len)
 #ifdef _M_IX86
 
 /* Float to long */
-void
-__declspec(naked)
-_ftol()
+void __declspec(naked) _ftol()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -120,22 +119,18 @@ localexit:
     /* *INDENT-ON* */
 }
 
-void
-_ftol2_sse()
+void _ftol2_sse()
 {
     _ftol();
 }
 
-void
-_ftol2()
+void _ftol2()
 {
     _ftol();
 }
 
 /* 64-bit math operators for 32-bit systems */
-void
-__declspec(naked)
-_allmul()
+void __declspec(naked) _allmul()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -163,9 +158,7 @@ hard:
     /* *INDENT-ON* */
 }
 
-void
-__declspec(naked)
-_alldiv()
+void __declspec(naked) _alldiv()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -251,9 +244,7 @@ L8:
     /* *INDENT-ON* */
 }
 
-void
-__declspec(naked)
-_aulldiv()
+void __declspec(naked) _aulldiv()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -309,9 +300,7 @@ L2:
     /* *INDENT-ON* */
 }
 
-void
-__declspec(naked)
-_allrem()
+void __declspec(naked) _allrem()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -396,9 +385,7 @@ L8:
     /* *INDENT-ON* */
 }
 
-void
-__declspec(naked)
-_aullrem()
+void __declspec(naked) _aullrem()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -455,9 +442,7 @@ L2:
     /* *INDENT-ON* */
 }
 
-void
-__declspec(naked)
-_alldvrm()
+void __declspec(naked) _alldvrm()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -565,9 +550,7 @@ L8:
     /* *INDENT-ON* */
 }
 
-void
-__declspec(naked)
-_aulldvrm()
+void __declspec(naked) _aulldvrm()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -638,9 +621,7 @@ L2:
     /* *INDENT-ON* */
 }
 
-void
-__declspec(naked)
-_allshl()
+void __declspec(naked) _allshl()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -665,9 +646,7 @@ RETZERO:
     /* *INDENT-ON* */
 }
 
-void
-__declspec(naked)
-_allshr()
+void __declspec(naked) _allshr()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -692,9 +671,7 @@ RETSIGN:
     /* *INDENT-ON* */
 }
 
-void
-__declspec(naked)
-_aullshr()
+void __declspec(naked) _aullshr()
 {
     /* *INDENT-OFF* */
     __asm {
@@ -719,10 +696,93 @@ RETZERO:
     /* *INDENT-ON* */
 }
 
+void __declspec(naked) _chkstk(void)
+{
+    __asm {
+        push        ecx
+        mov         ecx,esp     ; lea         ecx,dword ptr [esp]+4
+        add         ecx,4
+        sub         ecx,eax
+        sbb         eax,eax
+        not         eax
+        and         ecx,eax
+        mov         eax,esp
+        and         eax,0xfffff000
+L1:
+        cmp         ecx,eax
+        jb          short L2
+        mov         eax,ecx
+        pop         ecx
+        xchg        esp,eax
+        mov         eax,dword ptr [eax]
+        mov         dword ptr [esp],eax
+        ret
+L2:
+        sub         eax,0x1000
+        test        dword ptr [eax],eax
+        jmp         short L1
+    }
+}
+
+void __declspec(naked) _alloca_probe_8(void)
+{
+    /* *INDENT-OFF* */
+    __asm {
+        push        ecx
+        mov         ecx,esp     ; lea         ecx,dword ptr [esp]+8
+        add         ecx,8
+        sub         ecx,eax
+        and         ecx,0x7
+        add         eax,ecx
+        sbb         ecx,ecx
+        or          eax,ecx
+        pop         ecx
+        jmp         _chkstk
+    }
+    /* *INDENT-ON* */
+}
+
+void __declspec(naked) _alloca_probe_16(void)
+{
+    /* *INDENT-OFF* */
+    __asm {
+        push        ecx
+        mov         ecx,esp     ; lea         ecx,dword ptr [esp]+8
+        add         ecx,8
+        sub         ecx,eax
+        and         ecx,0xf
+        add         eax,ecx
+        sbb         ecx,ecx
+        or          eax,ecx
+        pop         ecx
+        jmp         _chkstk
+    }
+    /* *INDENT-ON* */
+}
+
 #endif /* _M_IX86 */
+
+#ifdef _M_ARM64
+
+void __chkstk(void);
+void __chkstk() {
+}
+
+#endif
 
 #endif /* MSC_VER */
 
-#endif /* !HAVE_LIBC && !SDL_STATIC_LIB */
+#ifdef __ICL
+/* The classic Intel compiler generates calls to _intel_fast_memcpy
+ * and _intel_fast_memset when building an optimized SDL library */
+void *_intel_fast_memcpy(void *dst, const void *src, size_t len)
+{
+    return SDL_memcpy(dst, src, len);
+}
+void *_intel_fast_memset(void *dst, int c, size_t len)
+{
+    return SDL_memset(dst, c, len);
+}
+#endif
 
-/* vi: set ts=4 sw=4 expandtab: */
+#endif /* !HAVE_LIBC && !SDL_STATIC_LIB */

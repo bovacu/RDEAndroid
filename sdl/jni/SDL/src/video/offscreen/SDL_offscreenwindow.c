@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,22 +18,22 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../../SDL_internal.h"
+#include "SDL_internal.h"
 
-#if SDL_VIDEO_DRIVER_OFFSCREEN
+#ifdef SDL_VIDEO_DRIVER_OFFSCREEN
 
 #include "../SDL_sysvideo.h"
+#include "../../events/SDL_windowevents_c.h"
 #include "../SDL_egl_c.h"
 
 #include "SDL_offscreenwindow.h"
 
-int
-OFFSCREEN_CreateWindow(_THIS, SDL_Window* window)
+int OFFSCREEN_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID create_props)
 {
-    OFFSCREEN_Window *offscreen_window = SDL_calloc(1, sizeof(OFFSCREEN_Window));
+    SDL_WindowData *offscreen_window = (SDL_WindowData *)SDL_calloc(1, sizeof(SDL_WindowData));
 
     if (!offscreen_window) {
-        return SDL_OutOfMemory();
+        return -1;
     }
 
     window->driverdata = offscreen_window;
@@ -48,7 +48,7 @@ OFFSCREEN_CreateWindow(_THIS, SDL_Window* window)
 
     offscreen_window->sdl_window = window;
 
-#if SDL_VIDEO_OPENGL_EGL
+#ifdef SDL_VIDEO_OPENGL_EGL
     if (window->flags & SDL_WINDOW_OPENGL) {
 
         if (!_this->egl_data) {
@@ -69,13 +69,12 @@ OFFSCREEN_CreateWindow(_THIS, SDL_Window* window)
     return 0;
 }
 
-void
-OFFSCREEN_DestroyWindow(_THIS, SDL_Window* window)
+void OFFSCREEN_DestroyWindow(SDL_VideoDevice *_this, SDL_Window *window)
 {
-    OFFSCREEN_Window* offscreen_window = window->driverdata;
+    SDL_WindowData *offscreen_window = window->driverdata;
 
     if (offscreen_window) {
-#if SDL_VIDEO_OPENGL_EGL
+#ifdef SDL_VIDEO_OPENGL_EGL
         SDL_EGL_DestroySurface(_this, offscreen_window->egl_surface);
 #endif
         SDL_free(offscreen_window);
@@ -84,6 +83,8 @@ OFFSCREEN_DestroyWindow(_THIS, SDL_Window* window)
     window->driverdata = NULL;
 }
 
+void OFFSCREEN_SetWindowSize(SDL_VideoDevice *_this, SDL_Window *window)
+{
+    SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_RESIZED, window->floating.w, window->floating.h);
+}
 #endif /* SDL_VIDEO_DRIVER_OFFSCREEN */
-
-/* vi: set ts=4 sw=4 expandtab: */

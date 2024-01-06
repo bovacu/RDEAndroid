@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,19 +18,19 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../SDL_internal.h"
+#include "SDL_internal.h"
 
-#include "SDL_video.h"
 #include "SDL_blit.h"
 #include "SDL_blit_slow.h"
 
-#define FORMAT_ALPHA      0
-#define FORMAT_NO_ALPHA  -1
-#define FORMAT_2101010    1
-#define FORMAT_HAS_ALPHA(format)        format == 0
-#define FORMAT_HAS_NO_ALPHA(format)     format < 0
-static int SDL_INLINE detect_format(SDL_PixelFormat *pf) {
-    if (pf->format == SDL_PIXELFORMAT_ARGB2101010) {
+#define FORMAT_ALPHA                0
+#define FORMAT_NO_ALPHA             (-1)
+#define FORMAT_2101010              1
+#define FORMAT_HAS_ALPHA(format)    format == 0
+#define FORMAT_HAS_NO_ALPHA(format) format < 0
+static int detect_format(SDL_PixelFormat *pf)
+{
+    if (SDL_ISPIXELFORMAT_10BIT(pf->format)) {
         return FORMAT_2101010;
     } else if (pf->Amask) {
         return FORMAT_ALPHA;
@@ -42,8 +42,7 @@ static int SDL_INLINE detect_format(SDL_PixelFormat *pf) {
 /* The ONE TRUE BLITTER
  * This puppy has to handle all the unoptimized cases - yes, it's slow.
  */
-void
-SDL_Blit_Slow(SDL_BlitInfo * info)
+void SDL_Blit_Slow(SDL_BlitInfo *info)
 {
     const int flags = info->flags;
     const Uint32 modulateR = info->r;
@@ -89,16 +88,34 @@ SDL_Blit_Slow(SDL_BlitInfo * info)
                 DISEMBLE_RGB(src, srcbpp, src_fmt, srcpixel, srcR, srcG, srcB);
                 srcA = 0xFF;
             } else {
-                /* SDL_PIXELFORMAT_ARGB2101010 */
+                /* 10-bit pixel format */
                 srcpixel = *((Uint32 *)(src));
-                RGBA_FROM_ARGB2101010(srcpixel, srcR, srcG, srcB, srcA);
+                switch (src_fmt->format) {
+                case SDL_PIXELFORMAT_XRGB2101010:
+                    RGBA_FROM_ARGB2101010(srcpixel, srcR, srcG, srcB, srcA);
+                    srcA = 0xFF;
+                    break;
+                case SDL_PIXELFORMAT_XBGR2101010:
+                    RGBA_FROM_ABGR2101010(srcpixel, srcR, srcG, srcB, srcA);
+                    srcA = 0xFF;
+                    break;
+                case SDL_PIXELFORMAT_ARGB2101010:
+                    RGBA_FROM_ARGB2101010(srcpixel, srcR, srcG, srcB, srcA);
+                    break;
+                case SDL_PIXELFORMAT_ABGR2101010:
+                    RGBA_FROM_ABGR2101010(srcpixel, srcR, srcG, srcB, srcA);
+                    break;
+                default:
+                    srcR = srcG = srcB = srcA = 0;
+                    break;
+                }
             }
 
             if (flags & SDL_COPY_COLORKEY) {
                 /* srcpixel isn't set for 24 bpp */
                 if (srcbpp == 3) {
                     srcpixel = (srcR << src_fmt->Rshift) |
-                        (srcG << src_fmt->Gshift) | (srcB << src_fmt->Bshift);
+                               (srcG << src_fmt->Gshift) | (srcB << src_fmt->Bshift);
                 }
                 if ((srcpixel & rgbmask) == ckey) {
                     posx += incx;
@@ -106,15 +123,20 @@ SDL_Blit_Slow(SDL_BlitInfo * info)
                     continue;
                 }
             }
-            if (FORMAT_HAS_ALPHA(dstfmt_val)) {
-                DISEMBLE_RGBA(dst, dstbpp, dst_fmt, dstpixel, dstR, dstG, dstB, dstA);
-            } else if (FORMAT_HAS_NO_ALPHA(dstfmt_val)) {
-                DISEMBLE_RGB(dst, dstbpp, dst_fmt, dstpixel, dstR, dstG, dstB);
-                dstA = 0xFF;
+            if ((flags & (SDL_COPY_BLEND | SDL_COPY_ADD | SDL_COPY_MOD | SDL_COPY_MUL))) {
+                if (FORMAT_HAS_ALPHA(dstfmt_val)) {
+                    DISEMBLE_RGBA(dst, dstbpp, dst_fmt, dstpixel, dstR, dstG, dstB, dstA);
+                } else if (FORMAT_HAS_NO_ALPHA(dstfmt_val)) {
+                    DISEMBLE_RGB(dst, dstbpp, dst_fmt, dstpixel, dstR, dstG, dstB);
+                    dstA = 0xFF;
+                } else {
+                    /* SDL_PIXELFORMAT_ARGB2101010 */
+                    dstpixel = *((Uint32 *) (dst));
+                    RGBA_FROM_ARGB2101010(dstpixel, dstR, dstG, dstB, dstA);
+                }
             } else {
-                /* SDL_PIXELFORMAT_ARGB2101010 */
-                dstpixel = *((Uint32 *)(dst));
-                RGBA_FROM_ARGB2101010(dstpixel, dstR, dstG, dstB, dstA);
+                /* don't care */
+                dstR = dstG = dstB = dstA = 0;
             }
 
             if (flags & SDL_COPY_MODULATE_COLOR) {
@@ -148,14 +170,17 @@ SDL_Blit_Slow(SDL_BlitInfo * info)
                 break;
             case SDL_COPY_ADD:
                 dstR = srcR + dstR;
-                if (dstR > 255)
+                if (dstR > 255) {
                     dstR = 255;
+                }
                 dstG = srcG + dstG;
-                if (dstG > 255)
+                if (dstG > 255) {
                     dstG = 255;
+                }
                 dstB = srcB + dstB;
-                if (dstB > 255)
+                if (dstB > 255) {
                     dstB = 255;
+                }
                 break;
             case SDL_COPY_MOD:
                 dstR = (srcR * dstR) / 255;
@@ -164,17 +189,17 @@ SDL_Blit_Slow(SDL_BlitInfo * info)
                 break;
             case SDL_COPY_MUL:
                 dstR = ((srcR * dstR) + (dstR * (255 - srcA))) / 255;
-                if (dstR > 255)
+                if (dstR > 255) {
                     dstR = 255;
+                }
                 dstG = ((srcG * dstG) + (dstG * (255 - srcA))) / 255;
-                if (dstG > 255)
+                if (dstG > 255) {
                     dstG = 255;
+                }
                 dstB = ((srcB * dstB) + (dstB * (255 - srcA))) / 255;
-                if (dstB > 255)
+                if (dstB > 255) {
                     dstB = 255;
-                dstA = ((srcA * dstA) + (dstA * (255 - srcA))) / 255;
-                if (dstA > 255)
-                    dstA = 255;
+                }
                 break;
             }
             if (FORMAT_HAS_ALPHA(dstfmt_val)) {
@@ -182,9 +207,25 @@ SDL_Blit_Slow(SDL_BlitInfo * info)
             } else if (FORMAT_HAS_NO_ALPHA(dstfmt_val)) {
                 ASSEMBLE_RGB(dst, dstbpp, dst_fmt, dstR, dstG, dstB);
             } else {
-                /* SDL_PIXELFORMAT_ARGB2101010 */
+                /* 10-bit pixel format */
                 Uint32 pixel;
-                ARGB2101010_FROM_RGBA(pixel, dstR, dstG, dstB, dstA);
+                switch (dst_fmt->format) {
+                case SDL_PIXELFORMAT_XRGB2101010:
+                    dstA = 0xFF;
+                    SDL_FALLTHROUGH;
+                case SDL_PIXELFORMAT_ARGB2101010:
+                    ARGB2101010_FROM_RGBA(pixel, dstR, dstG, dstB, dstA);
+                    break;
+                case SDL_PIXELFORMAT_XBGR2101010:
+                    dstA = 0xFF;
+                    SDL_FALLTHROUGH;
+                case SDL_PIXELFORMAT_ABGR2101010:
+                    ABGR2101010_FROM_RGBA(pixel, dstR, dstG, dstB, dstA);
+                    break;
+                default:
+                    pixel = 0;
+                    break;
+                }
                 *(Uint32 *)dst = pixel;
             }
             posx += incx;
@@ -194,5 +235,3 @@ SDL_Blit_Slow(SDL_BlitInfo * info)
         info->dst += info->dst_pitch;
     }
 }
-
-/* vi: set ts=4 sw=4 expandtab: */

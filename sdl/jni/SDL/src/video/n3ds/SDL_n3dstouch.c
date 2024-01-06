@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -19,7 +19,7 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "../../SDL_internal.h"
+#include "SDL_internal.h"
 
 #ifdef SDL_VIDEO_DRIVER_N3DS
 
@@ -36,23 +36,20 @@
   internally in a portrait disposition so the
   GSP_SCREEN constants are flipped.
 */
-#define TOUCHSCREEN_SCALE_X 1.0f / GSP_SCREEN_HEIGHT_BOTTOM
-#define TOUCHSCREEN_SCALE_Y 1.0f / GSP_SCREEN_WIDTH
+#define TOUCHSCREEN_SCALE_X 1.0f / (GSP_SCREEN_HEIGHT_BOTTOM - 1)
+#define TOUCHSCREEN_SCALE_Y 1.0f / (GSP_SCREEN_WIDTH - 1)
 
-void
-N3DS_InitTouch(void)
+void N3DS_InitTouch(void)
 {
     SDL_AddTouch(N3DS_TOUCH_ID, SDL_TOUCH_DEVICE_DIRECT, "Touchscreen");
 }
 
-void
-N3DS_QuitTouch(void)
+void N3DS_QuitTouch(void)
 {
     SDL_DelTouch(N3DS_TOUCH_ID);
 }
 
-void
-N3DS_PollTouch(void)
+void N3DS_PollTouch(void)
 {
     touchPosition touch;
     static SDL_bool was_pressed = SDL_FALSE;
@@ -62,7 +59,7 @@ N3DS_PollTouch(void)
 
     if (pressed != was_pressed) {
         was_pressed = pressed;
-        SDL_SendTouch(N3DS_TOUCH_ID,
+        SDL_SendTouch(0, N3DS_TOUCH_ID,
                       0,
                       NULL,
                       pressed,
@@ -70,7 +67,7 @@ N3DS_PollTouch(void)
                       touch.py * TOUCHSCREEN_SCALE_Y,
                       pressed ? 1.0f : 0.0f);
     } else if (pressed) {
-        SDL_SendTouchMotion(N3DS_TOUCH_ID,
+        SDL_SendTouchMotion(0, N3DS_TOUCH_ID,
                             0,
                             NULL,
                             touch.px * TOUCHSCREEN_SCALE_X,
@@ -80,5 +77,3 @@ N3DS_PollTouch(void)
 }
 
 #endif /* SDL_VIDEO_DRIVER_N3DS */
-
-/* vi: set sts=4 ts=4 sw=4 expandtab: */

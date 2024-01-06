@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -19,10 +19,10 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-#include "../../SDL_internal.h"
-#include "../../main/haiku/SDL_BApp.h"
+#include "SDL_internal.h"
+#include "../../core/haiku/SDL_BApp.h"
 
-#if SDL_VIDEO_DRIVER_HAIKU
+#ifdef SDL_VIDEO_DRIVER_HAIKU
 
 #include "SDL_BWin.h"
 #include <Url.h>
@@ -41,7 +41,7 @@ extern "C" {
 #include "SDL_bevents.h"
 
 static SDL_INLINE SDL_BWin *_ToBeWin(SDL_Window *window) {
-    return ((SDL_BWin*)(window->driverdata));
+    return (SDL_BWin *)(window->driverdata);
 }
 
 /* FIXME: Undefined functions */
@@ -54,11 +54,9 @@ static SDL_INLINE SDL_BWin *_ToBeWin(SDL_Window *window) {
 
 /* End undefined functions */
 
-static SDL_VideoDevice *
-HAIKU_CreateDevice(void)
+static SDL_VideoDevice * HAIKU_CreateDevice(void)
 {
     SDL_VideoDevice *device;
-    /*SDL_VideoData *data;*/
 
     /* Initialize all variables that we clean on shutdown */
     device = (SDL_VideoDevice *) SDL_calloc(1, sizeof(SDL_VideoDevice));
@@ -77,9 +75,7 @@ HAIKU_CreateDevice(void)
     device->PumpEvents = HAIKU_PumpEvents;
 
     device->CreateSDLWindow = HAIKU_CreateWindow;
-    device->CreateSDLWindowFrom = HAIKU_CreateWindowFrom;
     device->SetWindowTitle = HAIKU_SetWindowTitle;
-    device->SetWindowIcon = HAIKU_SetWindowIcon;
     device->SetWindowPosition = HAIKU_SetWindowPosition;
     device->SetWindowSize = HAIKU_SetWindowSize;
     device->ShowWindow = HAIKU_ShowWindow;
@@ -91,21 +87,14 @@ HAIKU_CreateDevice(void)
     device->SetWindowBordered = HAIKU_SetWindowBordered;
     device->SetWindowResizable = HAIKU_SetWindowResizable;
     device->SetWindowFullscreen = HAIKU_SetWindowFullscreen;
-    device->SetWindowGammaRamp = HAIKU_SetWindowGammaRamp;
-    device->GetWindowGammaRamp = HAIKU_GetWindowGammaRamp;
     device->SetWindowMouseGrab = HAIKU_SetWindowMouseGrab;
     device->SetWindowMinimumSize = HAIKU_SetWindowMinimumSize;
     device->DestroyWindow = HAIKU_DestroyWindow;
-    device->GetWindowWMInfo = HAIKU_GetWindowWMInfo;
     device->CreateWindowFramebuffer = HAIKU_CreateWindowFramebuffer;
     device->UpdateWindowFramebuffer = HAIKU_UpdateWindowFramebuffer;
     device->DestroyWindowFramebuffer = HAIKU_DestroyWindowFramebuffer;
-    
-    device->shape_driver.CreateShaper = NULL;
-    device->shape_driver.SetWindowShape = NULL;
-    device->shape_driver.ResizeWindowShape = NULL;
 
-#if SDL_VIDEO_OPENGL
+#ifdef SDL_VIDEO_OPENGL
     device->GL_LoadLibrary = HAIKU_GL_LoadLibrary;
     device->GL_GetProcAddress = HAIKU_GL_GetProcAddress;
     device->GL_UnloadLibrary = HAIKU_GL_UnloadLibrary;
@@ -141,8 +130,7 @@ void HAIKU_DeleteDevice(SDL_VideoDevice * device)
     SDL_free(device);
 }
 
-static SDL_Cursor *
-HAIKU_CreateSystemCursor(SDL_SystemCursor id)
+static SDL_Cursor * HAIKU_CreateSystemCursor(SDL_SystemCursor id)
 {
     SDL_Cursor *cursor;
     BCursorID cursorId = B_CURSOR_ID_SYSTEM_DEFAULT;
@@ -164,26 +152,30 @@ HAIKU_CreateSystemCursor(SDL_SystemCursor id)
     case SDL_SYSTEM_CURSOR_SIZEALL:   cursorId = B_CURSOR_ID_MOVE; break;
     case SDL_SYSTEM_CURSOR_NO:        cursorId = B_CURSOR_ID_NOT_ALLOWED; break;
     case SDL_SYSTEM_CURSOR_HAND:      cursorId = B_CURSOR_ID_FOLLOW_LINK; break;
+    case SDL_SYSTEM_CURSOR_WINDOW_TOPLEFT:     cursorId = B_CURSOR_ID_RESIZE_NORTH_WEST_SOUTH_EAST; break;
+    case SDL_SYSTEM_CURSOR_WINDOW_TOP:         cursorId = B_CURSOR_ID_RESIZE_NORTH_SOUTH; break;
+    case SDL_SYSTEM_CURSOR_WINDOW_TOPRIGHT:    cursorId = B_CURSOR_ID_RESIZE_NORTH_EAST_SOUTH_WEST; break;
+    case SDL_SYSTEM_CURSOR_WINDOW_RIGHT:       cursorId = B_CURSOR_ID_RESIZE_EAST_WEST; break;
+    case SDL_SYSTEM_CURSOR_WINDOW_BOTTOMRIGHT: cursorId = B_CURSOR_ID_RESIZE_NORTH_WEST_SOUTH_EAST; break;
+    case SDL_SYSTEM_CURSOR_WINDOW_BOTTOM:      cursorId = B_CURSOR_ID_RESIZE_NORTH_SOUTH; break;
+    case SDL_SYSTEM_CURSOR_WINDOW_BOTTOMLEFT:  cursorId = B_CURSOR_ID_RESIZE_NORTH_EAST_SOUTH_WEST; break;
+    case SDL_SYSTEM_CURSOR_WINDOW_LEFT:        cursorId = B_CURSOR_ID_RESIZE_EAST_WEST; break;
     }
 
     cursor = (SDL_Cursor *) SDL_calloc(1, sizeof(*cursor));
     if (cursor) {
         cursor->driverdata = (void *)new BCursor(cursorId);
-    } else {
-        SDL_OutOfMemory();
     }
 
     return cursor;
 }
 
-static SDL_Cursor *
-HAIKU_CreateDefaultCursor()
+static SDL_Cursor * HAIKU_CreateDefaultCursor()
 {
     return HAIKU_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
 }
 
-static void
-HAIKU_FreeCursor(SDL_Cursor * cursor)
+static void HAIKU_FreeCursor(SDL_Cursor * cursor)
 {
     if (cursor->driverdata) {
         delete (BCursor*) cursor->driverdata;
@@ -191,20 +183,19 @@ HAIKU_FreeCursor(SDL_Cursor * cursor)
     SDL_free(cursor);
 }
 
-static SDL_Cursor *
-HAIKU_CreateCursor(SDL_Surface * surface, int hot_x, int hot_y)
+static SDL_Cursor * HAIKU_CreateCursor(SDL_Surface * surface, int hot_x, int hot_y)
 {
     SDL_Cursor *cursor;
     SDL_Surface *converted;
 
-    converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ARGB8888, 0);
+    converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ARGB8888);
     if (!converted) {
         return NULL;
     }
 
 	BBitmap *cursorBitmap = new BBitmap(BRect(0, 0, surface->w - 1, surface->h - 1), B_RGBA32);
 	cursorBitmap->SetBits(converted->pixels, converted->h * converted->pitch, 0, B_RGBA32);
-    SDL_FreeSurface(converted);
+    SDL_DestroySurface(converted);
 
     cursor = (SDL_Cursor *) SDL_calloc(1, sizeof(*cursor));
     if (cursor) {
@@ -220,8 +211,9 @@ static int HAIKU_ShowCursor(SDL_Cursor *cursor)
 {
 	SDL_Mouse *mouse = SDL_GetMouse();
 
-	if (!mouse)
+	if (!mouse) {
 		return 0;
+	}
 
 	if (cursor) {
 		BCursor *hCursor = (BCursor*)cursor->driverdata;
@@ -235,8 +227,7 @@ static int HAIKU_ShowCursor(SDL_Cursor *cursor)
 	return 0;
 }
 
-static int
-HAIKU_SetRelativeMouseMode(SDL_bool enabled)
+static int HAIKU_SetRelativeMouseMode(SDL_bool enabled)
 {
     SDL_Window *window = SDL_GetMouseFocus();
     if (!window) {
@@ -256,11 +247,12 @@ HAIKU_SetRelativeMouseMode(SDL_bool enabled)
     return 0;
 }
 
-static void HAIKU_MouseInit(_THIS)
+static void HAIKU_MouseInit(SDL_VideoDevice *_this)
 {
 	SDL_Mouse *mouse = SDL_GetMouse();
-	if (!mouse)
+	if (!mouse) {
 		return;
+	}
 	mouse->CreateCursor = HAIKU_CreateCursor;
 	mouse->CreateSystemCursor = HAIKU_CreateSystemCursor;
 	mouse->ShowCursor = HAIKU_ShowCursor;
@@ -270,13 +262,13 @@ static void HAIKU_MouseInit(_THIS)
 	SDL_SetDefaultCursor(HAIKU_CreateDefaultCursor());
 }
 
-int HAIKU_VideoInit(_THIS)
+int HAIKU_VideoInit(SDL_VideoDevice *_this)
 {
     /* Initialize the Be Application for appserver interaction */
     if (SDL_InitBeApp() < 0) {
         return -1;
     }
-    
+
     /* Initialize video modes */
     HAIKU_InitModes(_this);
 
@@ -285,17 +277,17 @@ int HAIKU_VideoInit(_THIS)
 
     HAIKU_MouseInit(_this);
 
-#if SDL_VIDEO_OPENGL
+#ifdef SDL_VIDEO_OPENGL
         /* testgl application doesn't load library, just tries to load symbols */
         /* is it correct? if so we have to load library here */
     HAIKU_GL_LoadLibrary(_this, NULL);
 #endif
 
     /* We're done! */
-    return (0);
+    return 0;
 }
 
-void HAIKU_VideoQuit(_THIS)
+void HAIKU_VideoQuit(SDL_VideoDevice *_this)
 {
 
     HAIKU_QuitModes(_this);
@@ -309,7 +301,7 @@ int HAIKU_OpenURL(const char *url)
 {
     BUrl burl(url);
     const status_t rc = burl.OpenWithPreferredApplication(false);
-    return (rc == B_NO_ERROR) ? 0 : SDL_SetError("URL open failed (err=%d)", (int) rc);
+    return (rc == B_NO_ERROR) ? 0 : SDL_SetError("URL open failed (err=%d)", (int)rc);
 }
 
 #ifdef __cplusplus
@@ -317,5 +309,3 @@ int HAIKU_OpenURL(const char *url)
 #endif
 
 #endif /* SDL_VIDEO_DRIVER_HAIKU */
-
-/* vi: set ts=4 sw=4 expandtab: */

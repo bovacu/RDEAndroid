@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -10,13 +10,15 @@
   freely.
 */
 
-#include "SDL_test.h"
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+#include <SDL3/SDL_test.h>
 
 static int SDLCALL
 num_compare(const void *_a, const void *_b)
 {
-    const int a = *((const int *) _a);
-    const int b = *((const int *) _b);
+    const int a = *((const int *)_a);
+    const int b = *((const int *)_b);
     return (a < b) ? -1 : ((a > b) ? 1 : 0);
 }
 
@@ -28,7 +30,7 @@ test_sort(const char *desc, int *nums, const int arraylen)
 
     SDL_Log("test: %s arraylen=%d", desc, arraylen);
 
-    SDL_qsort(nums, arraylen, sizeof (nums[0]), num_compare);
+    SDL_qsort(nums, arraylen, sizeof(nums[0]), num_compare);
 
     prev = nums[0];
     for (i = 1; i < arraylen; i++) {
@@ -41,41 +43,63 @@ test_sort(const char *desc, int *nums, const int arraylen)
     }
 }
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     static int nums[1024 * 100];
     static const int itervals[] = { SDL_arraysize(nums), 12 };
+    int i;
     int iteration;
     SDLTest_RandomContext rndctx;
+    SDLTest_CommonState *state;
+    int seed_seen = 0;
 
-    if (argc > 1)
-    {
-        int success;
-        Uint64 seed = 0;
-        if (argv[1][0] == '0' && argv[1][1] == 'x')
-            success = SDL_sscanf(argv[1] + 2, "%"SDL_PRIx64, &seed);
-        else
-            success = SDL_sscanf(argv[1], "%"SDL_PRIu64, &seed);
-        if (!success) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Invalid seed. Use a decimal or hexadecimal number.\n");
-            return 1;
-        }
-        if (seed <= ((Uint64)0xffffffff)) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Seed must be equal or greater than 0x100000000.\n");
-            return 1;
-        }
-        SDLTest_RandomInit(&rndctx, (unsigned int)(seed >> 32), (unsigned int)(seed & 0xffffffff));
+    /* Initialize test framework */
+    state = SDLTest_CommonCreateState(argv, 0);
+    if (!state) {
+        return 1;
     }
-    else
-    {
+
+    /* Parse commandline */
+    for (i = 1; i < argc;) {
+        int consumed;
+
+        consumed = SDLTest_CommonArg(state, i);
+        if (!consumed) {
+            if (!seed_seen) {
+                Uint64 seed = 0;
+                char *endptr = NULL;
+
+                seed = SDL_strtoull(argv[i], &endptr, 0);
+                if (endptr != argv[i] && *endptr == '\0') {
+                    seed_seen = 1;
+                    consumed = 1;
+                } else {
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Invalid seed. Use a decimal or hexadecimal number.\n");
+                    return 1;
+                }
+                if (seed <= ((Uint64)0xffffffff)) {
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Seed must be equal or greater than 0x100000000.\n");
+                    return 1;
+                }
+                SDLTest_RandomInit(&rndctx, (unsigned int)(seed >> 32), (unsigned int)(seed & 0xffffffff));
+            }
+        }
+        if (consumed <= 0) {
+            static const char *options[] = { "[seed]", NULL };
+            SDLTest_CommonLogUsage(state, argv[0], options);
+            return 1;
+        }
+
+        i += consumed;
+    }
+
+    if (!seed_seen) {
         SDLTest_RandomInitTime(&rndctx);
     }
     SDL_Log("Using random seed 0x%08x%08x\n", rndctx.x, rndctx.c);
 
     for (iteration = 0; iteration < SDL_arraysize(itervals); iteration++) {
         const int arraylen = itervals[iteration];
-        int i;
 
         for (i = 0; i < arraylen; i++) {
             nums[i] = i;
@@ -85,11 +109,11 @@ main(int argc, char *argv[])
         for (i = 0; i < arraylen; i++) {
             nums[i] = i;
         }
-        nums[arraylen-1] = -1;
+        nums[arraylen - 1] = -1;
         test_sort("already sorted except last element", nums, arraylen);
 
         for (i = 0; i < arraylen; i++) {
-            nums[i] = (arraylen-1) - i;
+            nums[i] = (arraylen - 1) - i;
         }
         test_sort("reverse sorted", nums, arraylen);
 
@@ -99,8 +123,7 @@ main(int argc, char *argv[])
         test_sort("random sorted", nums, arraylen);
     }
 
+    SDLTest_CommonDestroyState(state);
+
     return 0;
 }
-
-/* vi: set ts=4 sw=4 expandtab: */
-

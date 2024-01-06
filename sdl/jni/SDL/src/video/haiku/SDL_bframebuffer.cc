@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,9 +18,9 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../../SDL_internal.h"
+#include "SDL_internal.h"
 
-#if SDL_VIDEO_DRIVER_HAIKU
+#ifdef SDL_VIDEO_DRIVER_HAIKU
 
 #include "SDL_bframebuffer.h"
 
@@ -29,26 +29,26 @@
 #include "SDL_bmodes.h"
 #include "SDL_BWin.h"
 
-#include "../../main/haiku/SDL_BApp.h"
+#include "../../core/haiku/SDL_BApp.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 static SDL_INLINE SDL_BWin *_ToBeWin(SDL_Window *window) {
-    return ((SDL_BWin*)(window->driverdata));
+    return (SDL_BWin *)(window->driverdata);
 }
 
-static SDL_INLINE SDL_BApp *_GetBeApp() {
-    return ((SDL_BApp*)be_app);
+static SDL_INLINE SDL_BLooper *_GetBeLooper() {
+    return SDL_Looper;
 }
 
-int HAIKU_CreateWindowFramebuffer(_THIS, SDL_Window * window,
+int HAIKU_CreateWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window * window,
                                        Uint32 * format,
                                        void ** pixels, int *pitch) {
     SDL_BWin *bwin = _ToBeWin(window);
     BScreen bscreen;
-    if(!bscreen.IsValid()) {
+    if (!bscreen.IsValid()) {
         return -1;
     }
 
@@ -65,14 +65,14 @@ int HAIKU_CreateWindowFramebuffer(_THIS, SDL_Window * window,
     /* Create the new bitmap object */
     BBitmap *bitmap = bwin->GetBitmap();
 
-    if(bitmap) {
+    if (bitmap) {
         delete bitmap;
     }
     bitmap = new BBitmap(bwin->Bounds(), (color_space)bmode.space,
             false,    /* Views not accepted */
             true);    /* Contiguous memory required */
 
-    if(bitmap->InitCheck() != B_OK) {
+    if (bitmap->InitCheck() != B_OK) {
         delete bitmap;
         return SDL_SetError("Could not initialize back buffer!");
     }
@@ -92,10 +92,11 @@ int HAIKU_CreateWindowFramebuffer(_THIS, SDL_Window * window,
 
 
 
-int HAIKU_UpdateWindowFramebuffer(_THIS, SDL_Window * window,
+int HAIKU_UpdateWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window * window,
                                       const SDL_Rect * rects, int numrects) {
-    if(!window)
+    if (!window) {
         return 0;
+    }
 
     SDL_BWin *bwin = _ToBeWin(window);
 
@@ -104,7 +105,7 @@ int HAIKU_UpdateWindowFramebuffer(_THIS, SDL_Window * window,
     return 0;
 }
 
-void HAIKU_DestroyWindowFramebuffer(_THIS, SDL_Window * window) {
+void HAIKU_DestroyWindowFramebuffer(SDL_VideoDevice *_this, SDL_Window * window) {
     SDL_BWin *bwin = _ToBeWin(window);
 
     bwin->LockBuffer();
@@ -124,5 +125,3 @@ void HAIKU_DestroyWindowFramebuffer(_THIS, SDL_Window * window) {
 #endif
 
 #endif /* SDL_VIDEO_DRIVER_HAIKU */
-
-/* vi: set ts=4 sw=4 expandtab: */

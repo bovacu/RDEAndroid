@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -20,17 +20,16 @@
 */
 
 #include "../SDL_syslocale.h"
-#include "../../SDL_internal.h"
+#include "SDL_internal.h"
 
 #include <3ds.h>
 
 /* Used when the CFGU fails to work. */
 #define BAD_LOCALE 255
 
-SDL_FORCE_INLINE u8 GetLocaleIndex(void);
+static u8 GetLocaleIndex(void);
 
-void
-SDL_SYS_GetPreferredLocales(char *buf, size_t buflen)
+int SDL_SYS_GetPreferredLocales(char *buf, size_t buflen)
 {
     /* The 3DS only supports these 12 languages, only one can be active at a time */
     static const char AVAILABLE_LOCALES[][6] = { "ja_JP", "en_US", "fr_FR", "de_DE",
@@ -40,10 +39,10 @@ SDL_SYS_GetPreferredLocales(char *buf, size_t buflen)
     if (current_locale != BAD_LOCALE) {
         SDL_strlcpy(buf, AVAILABLE_LOCALES[current_locale], buflen);
     }
+    return 0;
 }
 
-SDL_FORCE_INLINE u8
-GetLocaleIndex(void)
+static u8 GetLocaleIndex(void)
 {
     u8 current_locale;
     if (R_FAILED(cfguInit())) {
@@ -55,5 +54,3 @@ GetLocaleIndex(void)
     cfguExit();
     return current_locale;
 }
-
-/* vi: set sts=4 ts=4 sw=4 expandtab: */

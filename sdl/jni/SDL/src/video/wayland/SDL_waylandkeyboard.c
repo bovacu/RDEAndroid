@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,52 +18,52 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../../SDL_internal.h"
+#include "SDL_internal.h"
 
 #if SDL_VIDEO_DRIVER_WAYLAND
 
 #include "../SDL_sysvideo.h"
 #include "SDL_waylandvideo.h"
 #include "SDL_waylandevents_c.h"
+#include "../../events/SDL_keyboard_c.h"
 #include "text-input-unstable-v3-client-protocol.h"
 
-int
-Wayland_InitKeyboard(_THIS)
+int Wayland_InitKeyboard(SDL_VideoDevice *_this)
 {
 #ifdef SDL_USE_IME
     SDL_VideoData *driverdata = _this->driverdata;
-    if (driverdata->text_input_manager == NULL) {
+    if (!driverdata->text_input_manager) {
         SDL_IME_Init();
     }
 #endif
+    SDL_SetScancodeName(SDL_SCANCODE_APPLICATION, "Menu");
 
     return 0;
 }
 
-void
-Wayland_QuitKeyboard(_THIS)
+void Wayland_QuitKeyboard(SDL_VideoDevice *_this)
 {
 #ifdef SDL_USE_IME
     SDL_VideoData *driverdata = _this->driverdata;
-    if (driverdata->text_input_manager == NULL) {
+    if (!driverdata->text_input_manager) {
         SDL_IME_Quit();
     }
 #endif
 }
 
-void
-Wayland_StartTextInput(_THIS)
+void Wayland_StartTextInput(SDL_VideoDevice *_this)
 {
     SDL_VideoData *driverdata = _this->driverdata;
 
     if (driverdata->text_input_manager) {
         struct SDL_WaylandInput *input = driverdata->input;
-        if (input != NULL && input->text_input) {
+        if (input && input->text_input) {
             const SDL_Rect *rect = &input->text_input->cursor_rect;
 
             /* Don't re-enable if we're already enabled. */
-            if (input->text_input->is_enabled)
+            if (input->text_input->is_enabled) {
                 return;
+            }
 
             /* For some reason this has to be done twice, it appears to be a
              * bug in mutter? Maybe?
@@ -92,14 +92,13 @@ Wayland_StartTextInput(_THIS)
     }
 }
 
-void
-Wayland_StopTextInput(_THIS)
+void Wayland_StopTextInput(SDL_VideoDevice *_this)
 {
     SDL_VideoData *driverdata = _this->driverdata;
 
     if (driverdata->text_input_manager) {
         struct SDL_WaylandInput *input = driverdata->input;
-        if (input != NULL && input->text_input) {
+        if (input && input->text_input) {
             zwp_text_input_v3_disable(input->text_input->text_input);
             zwp_text_input_v3_commit(input->text_input->text_input);
             input->text_input->is_enabled = SDL_FALSE;
@@ -113,21 +112,13 @@ Wayland_StopTextInput(_THIS)
 #endif
 }
 
-void
-Wayland_SetTextInputRect(_THIS, const SDL_Rect *rect)
+int Wayland_SetTextInputRect(SDL_VideoDevice *_this, const SDL_Rect *rect)
 {
     SDL_VideoData *driverdata = _this->driverdata;
-
-    if (!rect) {
-        SDL_InvalidParamError("rect");
-        return;
-    }
-
     if (driverdata->text_input_manager) {
         struct SDL_WaylandInput *input = driverdata->input;
-        if (input != NULL && input->text_input) {
-            if (!SDL_RectEquals(rect, &input->text_input->cursor_rect))
-            {
+        if (input && input->text_input) {
+            if (!SDL_RectsEqual(rect, &input->text_input->cursor_rect)) {
                 SDL_copyp(&input->text_input->cursor_rect, rect);
                 zwp_text_input_v3_set_cursor_rectangle(input->text_input->text_input,
                                                        rect->x,
@@ -144,10 +135,10 @@ Wayland_SetTextInputRect(_THIS, const SDL_Rect *rect)
         SDL_IME_UpdateTextRect(rect);
     }
 #endif
+    return 0;
 }
 
-SDL_bool
-Wayland_HasScreenKeyboardSupport(_THIS)
+SDL_bool Wayland_HasScreenKeyboardSupport(SDL_VideoDevice *_this)
 {
     /* In reality we just want to return true when the screen keyboard is the
      * _only_ way to get text input. So, in addition to checking for the text
@@ -156,9 +147,7 @@ Wayland_HasScreenKeyboardSupport(_THIS)
     SDL_VideoData *driverdata = _this->driverdata;
     SDL_bool haskeyboard = (driverdata->input != NULL) && (driverdata->input->keyboard != NULL);
     SDL_bool hastextmanager = (driverdata->text_input_manager != NULL);
-    return (!haskeyboard && hastextmanager);
+    return !haskeyboard && hastextmanager;
 }
 
 #endif /* SDL_VIDEO_DRIVER_WAYLAND */
-
-/* vi: set ts=4 sw=4 expandtab: */

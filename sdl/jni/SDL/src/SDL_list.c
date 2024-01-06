@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,19 +18,17 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "./SDL_internal.h"
+#include "SDL_internal.h"
 
-#include "SDL.h"
 #include "./SDL_list.h"
 
 /* Push */
-int
-SDL_ListAdd(SDL_ListNode **head, void *ent)
+int SDL_ListAdd(SDL_ListNode **head, void *ent)
 {
-    SDL_ListNode *node = SDL_malloc(sizeof (*node));
+    SDL_ListNode *node = SDL_malloc(sizeof(*node));
 
-    if (node == NULL) {
-        return SDL_OutOfMemory();
+    if (!node) {
+        return -1;
     }
 
     node->entry = ent;
@@ -40,13 +38,12 @@ SDL_ListAdd(SDL_ListNode **head, void *ent)
 }
 
 /* Pop from end as a FIFO (if add with SDL_ListAdd) */
-void
-SDL_ListPop(SDL_ListNode **head, void **ent)
+void SDL_ListPop(SDL_ListNode **head, void **ent)
 {
     SDL_ListNode **ptr = head;
 
     /* Invalid or empty */
-    if (head == NULL || *head == NULL) {
+    if (!head || !*head) {
         return;
     }
 
@@ -55,15 +52,14 @@ SDL_ListPop(SDL_ListNode **head, void **ent)
     }
 
     if (ent) {
-       *ent = (*ptr)->entry;
+        *ent = (*ptr)->entry;
     }
 
     SDL_free(*ptr);
     *ptr = NULL;
 }
 
-void
-SDL_ListRemove(SDL_ListNode **head, void *ent)
+void SDL_ListRemove(SDL_ListNode **head, void *ent)
 {
     SDL_ListNode **ptr = head;
 
@@ -78,8 +74,7 @@ SDL_ListRemove(SDL_ListNode **head, void *ent)
     }
 }
 
-void
-SDL_ListClear(SDL_ListNode **head)
+void SDL_ListClear(SDL_ListNode **head)
 {
     SDL_ListNode *l = *head;
     *head = NULL;
@@ -89,5 +84,3 @@ SDL_ListClear(SDL_ListNode **head)
         SDL_free(tmp);
     }
 }
-
-/* vi: set ts=4 sw=4 expandtab: */

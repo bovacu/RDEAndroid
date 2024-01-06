@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,7 +18,7 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../../SDL_internal.h"
+#include "SDL_internal.h"
 
 #ifdef SDL_FILESYSTEM_EMSCRIPTEN
 
@@ -27,20 +27,15 @@
 #include <errno.h>
 #include <sys/stat.h>
 
-#include "SDL_error.h"
-#include "SDL_filesystem.h"
-
 #include <emscripten/emscripten.h>
 
-char *
-SDL_GetBasePath(void)
+char *SDL_GetBasePath(void)
 {
     char *retval = "/";
     return SDL_strdup(retval);
 }
 
-char *
-SDL_GetPrefPath(const char *org, const char *app)
+char *SDL_GetPrefPath(const char *org, const char *app)
 {
     const char *append = "/libsdl/";
     char *retval;
@@ -56,9 +51,8 @@ SDL_GetPrefPath(const char *org, const char *app)
     }
 
     len = SDL_strlen(append) + SDL_strlen(org) + SDL_strlen(app) + 3;
-    retval = (char *) SDL_malloc(len);
+    retval = (char *)SDL_malloc(len);
     if (!retval) {
-        SDL_OutOfMemory();
         return NULL;
     }
 
@@ -68,17 +62,18 @@ SDL_GetPrefPath(const char *org, const char *app)
         SDL_snprintf(retval, len, "%s%s/", append, app);
     }
 
-    for (ptr = retval+1; *ptr; ptr++) {
+    for (ptr = retval + 1; *ptr; ptr++) {
         if (*ptr == '/') {
             *ptr = '\0';
-            if (mkdir(retval, 0700) != 0 && errno != EEXIST)
+            if (mkdir(retval, 0700) != 0 && errno != EEXIST) {
                 goto error;
+            }
             *ptr = '/';
         }
     }
 
     if (mkdir(retval, 0700) != 0 && errno != EEXIST) {
-error:
+    error:
         SDL_SetError("Couldn't create directory '%s': '%s'", retval, strerror(errno));
         SDL_free(retval);
         return NULL;
@@ -87,6 +82,22 @@ error:
     return retval;
 }
 
-#endif /* SDL_FILESYSTEM_EMSCRIPTEN */
+char *SDL_GetUserFolder(SDL_Folder folder)
+{
+    const char *home = NULL;
 
-/* vi: set ts=4 sw=4 expandtab: */
+    if (folder != SDL_FOLDER_HOME) {
+        SDL_SetError("Emscripten only supports the home folder");
+        return NULL;
+    }
+
+    home = SDL_getenv("HOME");
+    if (!home) {
+        SDL_SetError("No $HOME environment variable available");
+        return NULL;
+    }
+
+    return SDL_strdup(home);
+}
+
+#endif /* SDL_FILESYSTEM_EMSCRIPTEN */

@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,47 +18,60 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../../SDL_internal.h"
+#include "SDL_internal.h"
 
-#if defined(SDL_JOYSTICK_VIRTUAL)
+#ifdef SDL_JOYSTICK_VIRTUAL
 
 /* This is the virtual implementation of the SDL joystick API */
 
-#include "SDL_endian.h"
 #include "SDL_virtualjoystick_c.h"
 #include "../SDL_sysjoystick.h"
 #include "../SDL_joystick_c.h"
 
+static joystick_hwdata *g_VJoys SDL_GUARDED_BY(SDL_joystick_lock) = NULL;
 
-static joystick_hwdata * g_VJoys = NULL;
-
-
-static joystick_hwdata *
-VIRTUAL_HWDataForIndex(int device_index)
+static joystick_hwdata *VIRTUAL_HWDataForInstance(SDL_JoystickID instance_id)
 {
-    joystick_hwdata *vjoy = g_VJoys;
-    while (vjoy) {
-        if (device_index == 0)
+    joystick_hwdata *vjoy;
+
+    SDL_AssertJoysticksLocked();
+
+    for (vjoy = g_VJoys; vjoy; vjoy = vjoy->next) {
+        if (instance_id == vjoy->instance_id) {
+            return vjoy;
+        }
+    }
+    return NULL;
+}
+
+static joystick_hwdata *VIRTUAL_HWDataForIndex(int device_index)
+{
+    joystick_hwdata *vjoy;
+
+    SDL_AssertJoysticksLocked();
+
+    for (vjoy = g_VJoys; vjoy; vjoy = vjoy->next) {
+        if (device_index == 0) {
             break;
+        }
         --device_index;
-        vjoy = vjoy->next;
     }
     return vjoy;
 }
 
-
-static void
-VIRTUAL_FreeHWData(joystick_hwdata *hwdata)
+static void VIRTUAL_FreeHWData(joystick_hwdata *hwdata)
 {
-    joystick_hwdata * cur = g_VJoys;
-    joystick_hwdata * prev = NULL;
- 
+    joystick_hwdata *cur;
+    joystick_hwdata *prev = NULL;
+
+    SDL_AssertJoysticksLocked();
+
     if (!hwdata) {
         return;
     }
 
     /* Remove hwdata from SDL-global list */
-    while (cur) {
+    for (cur = g_VJoys; cur; prev = cur, cur = cur->next) {
         if (hwdata == cur) {
             if (prev) {
                 prev->next = cur->next;
@@ -67,8 +80,6 @@ VIRTUAL_FreeHWData(joystick_hwdata *hwdata)
             }
             break;
         }
-        prev = cur;
-        cur = cur->next;
     }
 
     if (hwdata->joystick) {
@@ -94,28 +105,27 @@ VIRTUAL_FreeHWData(joystick_hwdata *hwdata)
     SDL_free(hwdata);
 }
 
-
-int
-SDL_JoystickAttachVirtualInner(const SDL_VirtualJoystickDesc *desc)
+SDL_JoystickID SDL_JoystickAttachVirtualInner(const SDL_VirtualJoystickDesc *desc)
 {
     joystick_hwdata *hwdata = NULL;
-    int device_index = -1;
     const char *name = NULL;
     int axis_triggerleft = -1;
     int axis_triggerright = -1;
+
+    SDL_AssertJoysticksLocked();
 
     if (!desc) {
         return SDL_InvalidParamError("desc");
     }
     if (desc->version != SDL_VIRTUAL_JOYSTICK_DESC_VERSION) {
         /* Is this an old version that we can support? */
-        return SDL_SetError("Unsupported virtual joystick description version %d", desc->version);
+        return SDL_SetError("Unsupported virtual joystick description version %u", desc->version);
     }
 
     hwdata = SDL_calloc(1, sizeof(joystick_hwdata));
     if (!hwdata) {
         VIRTUAL_FreeHWData(hwdata);
-        return SDL_OutOfMemory();
+        return 0;
     }
     SDL_memcpy(&hwdata->desc, desc, sizeof(*desc));
 
@@ -123,7 +133,7 @@ SDL_JoystickAttachVirtualInner(const SDL_VirtualJoystickDesc *desc)
         name = hwdata->desc.name;
     } else {
         switch (hwdata->desc.type) {
-        case SDL_JOYSTICK_TYPE_GAMECONTROLLER:
+        case SDL_JOYSTICK_TYPE_GAMEPAD:
             name = "Virtual Controller";
             break;
         case SDL_JOYSTICK_TYPE_WHEEL:
@@ -157,35 +167,35 @@ SDL_JoystickAttachVirtualInner(const SDL_VirtualJoystickDesc *desc)
     }
     hwdata->name = SDL_strdup(name);
 
-    if (hwdata->desc.type == SDL_JOYSTICK_TYPE_GAMECONTROLLER) {
+    if (hwdata->desc.type == SDL_JOYSTICK_TYPE_GAMEPAD) {
         int i, axis;
 
         if (hwdata->desc.button_mask == 0) {
-            for (i = 0; i < hwdata->desc.nbuttons && i < sizeof(hwdata->desc.button_mask)*8; ++i) {
+            for (i = 0; i < hwdata->desc.nbuttons && i < sizeof(hwdata->desc.button_mask) * 8; ++i) {
                 hwdata->desc.button_mask |= (1 << i);
             }
         }
 
         if (hwdata->desc.axis_mask == 0) {
             if (hwdata->desc.naxes >= 2) {
-                hwdata->desc.axis_mask |= ((1 << SDL_CONTROLLER_AXIS_LEFTX) | (1 << SDL_CONTROLLER_AXIS_LEFTY));
+                hwdata->desc.axis_mask |= ((1 << SDL_GAMEPAD_AXIS_LEFTX) | (1 << SDL_GAMEPAD_AXIS_LEFTY));
             }
             if (hwdata->desc.naxes >= 4) {
-                hwdata->desc.axis_mask |= ((1 << SDL_CONTROLLER_AXIS_RIGHTX) | (1 << SDL_CONTROLLER_AXIS_RIGHTY));
+                hwdata->desc.axis_mask |= ((1 << SDL_GAMEPAD_AXIS_RIGHTX) | (1 << SDL_GAMEPAD_AXIS_RIGHTY));
             }
             if (hwdata->desc.naxes >= 6) {
-                hwdata->desc.axis_mask |= ((1 << SDL_CONTROLLER_AXIS_TRIGGERLEFT) | (1 << SDL_CONTROLLER_AXIS_TRIGGERRIGHT));
+                hwdata->desc.axis_mask |= ((1 << SDL_GAMEPAD_AXIS_LEFT_TRIGGER) | (1 << SDL_GAMEPAD_AXIS_RIGHT_TRIGGER));
             }
         }
 
         /* Find the trigger axes */
         axis = 0;
-        for (i = 0; axis < hwdata->desc.naxes && i < SDL_CONTROLLER_AXIS_MAX; ++i) {
+        for (i = 0; axis < hwdata->desc.naxes && i < SDL_GAMEPAD_AXIS_MAX; ++i) {
             if (hwdata->desc.axis_mask & (1 << i)) {
-                if (i == SDL_CONTROLLER_AXIS_TRIGGERLEFT) {
+                if (i == SDL_GAMEPAD_AXIS_LEFT_TRIGGER) {
                     axis_triggerleft = axis;
                 }
-                if (i == SDL_CONTROLLER_AXIS_TRIGGERRIGHT) {
+                if (i == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) {
                     axis_triggerright = axis;
                 }
                 ++axis;
@@ -193,14 +203,14 @@ SDL_JoystickAttachVirtualInner(const SDL_VirtualJoystickDesc *desc)
         }
     }
 
-    hwdata->guid = SDL_CreateJoystickGUID(SDL_HARDWARE_BUS_VIRTUAL, hwdata->desc.vendor_id, hwdata->desc.product_id, 0, name, 'v', (Uint8)hwdata->desc.type);
+    hwdata->guid = SDL_CreateJoystickGUID(SDL_HARDWARE_BUS_VIRTUAL, hwdata->desc.vendor_id, hwdata->desc.product_id, 0, NULL, name, 'v', (Uint8)hwdata->desc.type);
 
     /* Allocate fields for different control-types */
     if (hwdata->desc.naxes > 0) {
         hwdata->axes = SDL_calloc(hwdata->desc.naxes, sizeof(Sint16));
         if (!hwdata->axes) {
             VIRTUAL_FreeHWData(hwdata);
-            return SDL_OutOfMemory();
+            return 0;
         }
 
         /* Trigger axes are at minimum value at rest */
@@ -215,26 +225,25 @@ SDL_JoystickAttachVirtualInner(const SDL_VirtualJoystickDesc *desc)
         hwdata->buttons = SDL_calloc(hwdata->desc.nbuttons, sizeof(Uint8));
         if (!hwdata->buttons) {
             VIRTUAL_FreeHWData(hwdata);
-            return SDL_OutOfMemory();
+            return 0;
         }
     }
     if (hwdata->desc.nhats > 0) {
         hwdata->hats = SDL_calloc(hwdata->desc.nhats, sizeof(Uint8));
         if (!hwdata->hats) {
             VIRTUAL_FreeHWData(hwdata);
-            return SDL_OutOfMemory();
+            return 0;
         }
     }
 
     /* Allocate an instance ID for this device */
-    hwdata->instance_id = SDL_GetNextJoystickInstanceID();
+    hwdata->instance_id = SDL_GetNextObjectID();
 
     /* Add virtual joystick to SDL-global lists */
     if (g_VJoys) {
         joystick_hwdata *last;
 
         for (last = g_VJoys; last->next; last = last->next) {
-            continue;
         }
         last->next = hwdata;
     } else {
@@ -242,33 +251,25 @@ SDL_JoystickAttachVirtualInner(const SDL_VirtualJoystickDesc *desc)
     }
     SDL_PrivateJoystickAdded(hwdata->instance_id);
 
-    /* Return the new virtual-device's index */
-    device_index = SDL_JoystickGetDeviceIndexFromInstanceID(hwdata->instance_id);
-    return device_index;
+    return hwdata->instance_id;
 }
 
-
-int
-SDL_JoystickDetachVirtualInner(int device_index)
+int SDL_JoystickDetachVirtualInner(SDL_JoystickID instance_id)
 {
-    SDL_JoystickID instance_id;
-    joystick_hwdata *hwdata = VIRTUAL_HWDataForIndex(device_index);
+    joystick_hwdata *hwdata = VIRTUAL_HWDataForInstance(instance_id);
     if (!hwdata) {
         return SDL_SetError("Virtual joystick data not found");
     }
-    instance_id = hwdata->instance_id;
     VIRTUAL_FreeHWData(hwdata);
     SDL_PrivateJoystickRemoved(instance_id);
     return 0;
 }
 
-
-int
-SDL_JoystickSetVirtualAxisInner(SDL_Joystick *joystick, int axis, Sint16 value)
+int SDL_SetJoystickVirtualAxisInner(SDL_Joystick *joystick, int axis, Sint16 value)
 {
     joystick_hwdata *hwdata;
 
-    SDL_LockJoysticks();
+    SDL_AssertJoysticksLocked();
 
     if (!joystick || !joystick->hwdata) {
         SDL_UnlockJoysticks();
@@ -283,17 +284,14 @@ SDL_JoystickSetVirtualAxisInner(SDL_Joystick *joystick, int axis, Sint16 value)
 
     hwdata->axes[axis] = value;
 
-    SDL_UnlockJoysticks();
     return 0;
 }
 
-
-int
-SDL_JoystickSetVirtualButtonInner(SDL_Joystick *joystick, int button, Uint8 value)
+int SDL_SetJoystickVirtualButtonInner(SDL_Joystick *joystick, int button, Uint8 value)
 {
     joystick_hwdata *hwdata;
 
-    SDL_LockJoysticks();
+    SDL_AssertJoysticksLocked();
 
     if (!joystick || !joystick->hwdata) {
         SDL_UnlockJoysticks();
@@ -308,17 +306,14 @@ SDL_JoystickSetVirtualButtonInner(SDL_Joystick *joystick, int button, Uint8 valu
 
     hwdata->buttons[button] = value;
 
-    SDL_UnlockJoysticks();
     return 0;
 }
 
-
-int
-SDL_JoystickSetVirtualHatInner(SDL_Joystick *joystick, int hat, Uint8 value)
+int SDL_SetJoystickVirtualHatInner(SDL_Joystick *joystick, int hat, Uint8 value)
 {
     joystick_hwdata *hwdata;
 
-    SDL_LockJoysticks();
+    SDL_AssertJoysticksLocked();
 
     if (!joystick || !joystick->hwdata) {
         SDL_UnlockJoysticks();
@@ -333,39 +328,32 @@ SDL_JoystickSetVirtualHatInner(SDL_Joystick *joystick, int hat, Uint8 value)
 
     hwdata->hats[hat] = value;
 
-    SDL_UnlockJoysticks();
     return 0;
 }
 
-
-static int
-VIRTUAL_JoystickInit(void)
+static int VIRTUAL_JoystickInit(void)
 {
     return 0;
 }
 
-
-static int
-VIRTUAL_JoystickGetCount(void)
+static int VIRTUAL_JoystickGetCount(void)
 {
+    joystick_hwdata *cur;
     int count = 0;
-    joystick_hwdata *cur = g_VJoys;
-    while (cur) {
+
+    SDL_AssertJoysticksLocked();
+
+    for (cur = g_VJoys; cur; cur = cur->next) {
         ++count;
-        cur = cur->next;
     }
     return count;
 }
 
-
-static void
-VIRTUAL_JoystickDetect(void)
+static void VIRTUAL_JoystickDetect(void)
 {
 }
 
-
-static const char *
-VIRTUAL_JoystickGetDeviceName(int device_index)
+static const char *VIRTUAL_JoystickGetDeviceName(int device_index)
 {
     joystick_hwdata *hwdata = VIRTUAL_HWDataForIndex(device_index);
     if (!hwdata) {
@@ -374,23 +362,22 @@ VIRTUAL_JoystickGetDeviceName(int device_index)
     return hwdata->name;
 }
 
-
-static const char *
-VIRTUAL_JoystickGetDevicePath(int device_index)
+static const char *VIRTUAL_JoystickGetDevicePath(int device_index)
 {
     return NULL;
 }
 
-
-static int
-VIRTUAL_JoystickGetDevicePlayerIndex(int device_index)
+static int VIRTUAL_JoystickGetDeviceSteamVirtualGamepadSlot(int device_index)
 {
     return -1;
 }
 
+static int VIRTUAL_JoystickGetDevicePlayerIndex(int device_index)
+{
+    return -1;
+}
 
-static void
-VIRTUAL_JoystickSetDevicePlayerIndex(int device_index, int player_index)
+static void VIRTUAL_JoystickSetDevicePlayerIndex(int device_index, int player_index)
 {
     joystick_hwdata *hwdata = VIRTUAL_HWDataForIndex(device_index);
 
@@ -399,9 +386,7 @@ VIRTUAL_JoystickSetDevicePlayerIndex(int device_index, int player_index)
     }
 }
 
-
-static SDL_JoystickGUID
-VIRTUAL_JoystickGetDeviceGUID(int device_index)
+static SDL_JoystickGUID VIRTUAL_JoystickGetDeviceGUID(int device_index)
 {
     joystick_hwdata *hwdata = VIRTUAL_HWDataForIndex(device_index);
     if (!hwdata) {
@@ -412,22 +397,22 @@ VIRTUAL_JoystickGetDeviceGUID(int device_index)
     return hwdata->guid;
 }
 
-
-static SDL_JoystickID
-VIRTUAL_JoystickGetDeviceInstanceID(int device_index)
+static SDL_JoystickID VIRTUAL_JoystickGetDeviceInstanceID(int device_index)
 {
     joystick_hwdata *hwdata = VIRTUAL_HWDataForIndex(device_index);
     if (!hwdata) {
-        return -1;
+        return 0;
     }
     return hwdata->instance_id;
 }
 
-
-static int
-VIRTUAL_JoystickOpen(SDL_Joystick *joystick, int device_index)
+static int VIRTUAL_JoystickOpen(SDL_Joystick *joystick, int device_index)
 {
-    joystick_hwdata *hwdata = VIRTUAL_HWDataForIndex(device_index);
+    joystick_hwdata *hwdata;
+
+    SDL_AssertJoysticksLocked();
+
+    hwdata = VIRTUAL_HWDataForIndex(device_index);
     if (!hwdata) {
         return SDL_SetError("No such device");
     }
@@ -440,11 +425,11 @@ VIRTUAL_JoystickOpen(SDL_Joystick *joystick, int device_index)
     return 0;
 }
 
-
-static int
-VIRTUAL_JoystickRumble(SDL_Joystick *joystick, Uint16 low_frequency_rumble, Uint16 high_frequency_rumble)
+static int VIRTUAL_JoystickRumble(SDL_Joystick *joystick, Uint16 low_frequency_rumble, Uint16 high_frequency_rumble)
 {
     int result;
+
+    SDL_AssertJoysticksLocked();
 
     if (joystick->hwdata) {
         joystick_hwdata *hwdata = joystick->hwdata;
@@ -460,10 +445,11 @@ VIRTUAL_JoystickRumble(SDL_Joystick *joystick, Uint16 low_frequency_rumble, Uint
     return result;
 }
 
-static int
-VIRTUAL_JoystickRumbleTriggers(SDL_Joystick *joystick, Uint16 left_rumble, Uint16 right_rumble)
+static int VIRTUAL_JoystickRumbleTriggers(SDL_Joystick *joystick, Uint16 left_rumble, Uint16 right_rumble)
 {
     int result;
+
+    SDL_AssertJoysticksLocked();
 
     if (joystick->hwdata) {
         joystick_hwdata *hwdata = joystick->hwdata;
@@ -479,13 +465,14 @@ VIRTUAL_JoystickRumbleTriggers(SDL_Joystick *joystick, Uint16 left_rumble, Uint1
     return result;
 }
 
-
-static Uint32
-VIRTUAL_JoystickGetCapabilities(SDL_Joystick *joystick)
+static Uint32 VIRTUAL_JoystickGetCapabilities(SDL_Joystick *joystick)
 {
-    joystick_hwdata *hwdata = joystick->hwdata;
+    joystick_hwdata *hwdata;
     Uint32 caps = 0;
 
+    SDL_AssertJoysticksLocked();
+
+    hwdata = joystick->hwdata;
     if (hwdata) {
         if (hwdata->desc.Rumble) {
             caps |= SDL_JOYCAP_RUMBLE;
@@ -500,11 +487,11 @@ VIRTUAL_JoystickGetCapabilities(SDL_Joystick *joystick)
     return caps;
 }
 
-
-static int
-VIRTUAL_JoystickSetLED(SDL_Joystick *joystick, Uint8 red, Uint8 green, Uint8 blue)
+static int VIRTUAL_JoystickSetLED(SDL_Joystick *joystick, Uint8 red, Uint8 green, Uint8 blue)
 {
     int result;
+
+    SDL_AssertJoysticksLocked();
 
     if (joystick->hwdata) {
         joystick_hwdata *hwdata = joystick->hwdata;
@@ -520,10 +507,11 @@ VIRTUAL_JoystickSetLED(SDL_Joystick *joystick, Uint8 red, Uint8 green, Uint8 blu
     return result;
 }
 
-static int
-VIRTUAL_JoystickSendEffect(SDL_Joystick *joystick, const void *data, int size)
+static int VIRTUAL_JoystickSendEffect(SDL_Joystick *joystick, const void *data, int size)
 {
     int result;
+
+    SDL_AssertJoysticksLocked();
 
     if (joystick->hwdata) {
         joystick_hwdata *hwdata = joystick->hwdata;
@@ -539,18 +527,18 @@ VIRTUAL_JoystickSendEffect(SDL_Joystick *joystick, const void *data, int size)
     return result;
 }
 
-static int
-VIRTUAL_JoystickSetSensorsEnabled(SDL_Joystick *joystick, SDL_bool enabled)
+static int VIRTUAL_JoystickSetSensorsEnabled(SDL_Joystick *joystick, SDL_bool enabled)
 {
     return SDL_Unsupported();
 }
 
-
-static void
-VIRTUAL_JoystickUpdate(SDL_Joystick *joystick)
+static void VIRTUAL_JoystickUpdate(SDL_Joystick *joystick)
 {
     joystick_hwdata *hwdata;
-    int i;
+    Uint8 i;
+    Uint64 timestamp = SDL_GetTicksNS();
+
+    SDL_AssertJoysticksLocked();
 
     if (!joystick) {
         return;
@@ -566,20 +554,20 @@ VIRTUAL_JoystickUpdate(SDL_Joystick *joystick)
     }
 
     for (i = 0; i < hwdata->desc.naxes; ++i) {
-        SDL_PrivateJoystickAxis(joystick, i, hwdata->axes[i]);
+        SDL_SendJoystickAxis(timestamp, joystick, i, hwdata->axes[i]);
     }
     for (i = 0; i < hwdata->desc.nbuttons; ++i) {
-        SDL_PrivateJoystickButton(joystick, i, hwdata->buttons[i]);
+        SDL_SendJoystickButton(timestamp, joystick, i, hwdata->buttons[i]);
     }
     for (i = 0; i < hwdata->desc.nhats; ++i) {
-        SDL_PrivateJoystickHat(joystick, i, hwdata->hats[i]);
+        SDL_SendJoystickHat(timestamp, joystick, i, hwdata->hats[i]);
     }
 }
 
-
-static void
-VIRTUAL_JoystickClose(SDL_Joystick *joystick)
+static void VIRTUAL_JoystickClose(SDL_Joystick *joystick)
 {
+    SDL_AssertJoysticksLocked();
+
     if (joystick->hwdata) {
         joystick_hwdata *hwdata = joystick->hwdata;
         hwdata->joystick = NULL;
@@ -587,152 +575,151 @@ VIRTUAL_JoystickClose(SDL_Joystick *joystick)
     }
 }
 
-
-static void
-VIRTUAL_JoystickQuit(void)
+static void VIRTUAL_JoystickQuit(void)
 {
+    SDL_AssertJoysticksLocked();
+
     while (g_VJoys) {
         VIRTUAL_FreeHWData(g_VJoys);
     }
 }
 
-static SDL_bool
-VIRTUAL_JoystickGetGamepadMapping(int device_index, SDL_GamepadMapping *out)
+static SDL_bool VIRTUAL_JoystickGetGamepadMapping(int device_index, SDL_GamepadMapping *out)
 {
     joystick_hwdata *hwdata = VIRTUAL_HWDataForIndex(device_index);
-    int current_button = 0;
-    int current_axis = 0;
+    Uint8 current_button = 0;
+    Uint8 current_axis = 0;
 
-    if (hwdata->desc.type != SDL_JOYSTICK_TYPE_GAMECONTROLLER) {
+    if (!hwdata || hwdata->desc.type != SDL_JOYSTICK_TYPE_GAMEPAD) {
         return SDL_FALSE;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_A))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_SOUTH))) {
         out->a.kind = EMappingKind_Button;
         out->a.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_B))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_EAST))) {
         out->b.kind = EMappingKind_Button;
         out->b.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_X))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_WEST))) {
         out->x.kind = EMappingKind_Button;
         out->x.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_Y))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_NORTH))) {
         out->y.kind = EMappingKind_Button;
         out->y.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_BACK))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_BACK))) {
         out->back.kind = EMappingKind_Button;
         out->back.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_GUIDE))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_GUIDE))) {
         out->guide.kind = EMappingKind_Button;
         out->guide.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_START))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_START))) {
         out->start.kind = EMappingKind_Button;
         out->start.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_LEFTSTICK))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_LEFT_STICK))) {
         out->leftstick.kind = EMappingKind_Button;
         out->leftstick.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_RIGHTSTICK))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_RIGHT_STICK))) {
         out->rightstick.kind = EMappingKind_Button;
         out->rightstick.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_LEFTSHOULDER))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_LEFT_SHOULDER))) {
         out->leftshoulder.kind = EMappingKind_Button;
         out->leftshoulder.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER))) {
         out->rightshoulder.kind = EMappingKind_Button;
         out->rightshoulder.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_DPAD_UP))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_DPAD_UP))) {
         out->dpup.kind = EMappingKind_Button;
         out->dpup.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_DPAD_DOWN))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_DPAD_DOWN))) {
         out->dpdown.kind = EMappingKind_Button;
         out->dpdown.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_DPAD_LEFT))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_DPAD_LEFT))) {
         out->dpleft.kind = EMappingKind_Button;
         out->dpleft.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_DPAD_RIGHT))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_DPAD_RIGHT))) {
         out->dpright.kind = EMappingKind_Button;
         out->dpright.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_MISC1))) {
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_MISC1))) {
         out->misc1.kind = EMappingKind_Button;
         out->misc1.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_PADDLE1))) {
-        out->paddle1.kind = EMappingKind_Button;
-        out->paddle1.target = current_button++;
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1))) {
+        out->right_paddle1.kind = EMappingKind_Button;
+        out->right_paddle1.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_PADDLE2))) {
-        out->paddle2.kind = EMappingKind_Button;
-        out->paddle2.target = current_button++;
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_LEFT_PADDLE1))) {
+        out->left_paddle1.kind = EMappingKind_Button;
+        out->left_paddle1.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_PADDLE3))) {
-        out->paddle3.kind = EMappingKind_Button;
-        out->paddle3.target = current_button++;
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2))) {
+        out->right_paddle2.kind = EMappingKind_Button;
+        out->right_paddle2.target = current_button++;
     }
 
-    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_CONTROLLER_BUTTON_PADDLE4))) {
-        out->paddle4.kind = EMappingKind_Button;
-        out->paddle4.target = current_button++;
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_LEFT_PADDLE2))) {
+        out->left_paddle2.kind = EMappingKind_Button;
+        out->left_paddle2.target = current_button++;
     }
 
-    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_CONTROLLER_AXIS_LEFTX))) {
+    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_GAMEPAD_AXIS_LEFTX))) {
         out->leftx.kind = EMappingKind_Axis;
         out->leftx.target = current_axis++;
     }
 
-    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_CONTROLLER_AXIS_LEFTY))) {
+    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_GAMEPAD_AXIS_LEFTY))) {
         out->lefty.kind = EMappingKind_Axis;
         out->lefty.target = current_axis++;
     }
 
-    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_CONTROLLER_AXIS_RIGHTX))) {
+    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_GAMEPAD_AXIS_RIGHTX))) {
         out->rightx.kind = EMappingKind_Axis;
         out->rightx.target = current_axis++;
     }
 
-    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_CONTROLLER_AXIS_RIGHTY))) {
+    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_GAMEPAD_AXIS_RIGHTY))) {
         out->righty.kind = EMappingKind_Axis;
         out->righty.target = current_axis++;
     }
 
-    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_CONTROLLER_AXIS_TRIGGERLEFT))) {
+    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_GAMEPAD_AXIS_LEFT_TRIGGER))) {
         out->lefttrigger.kind = EMappingKind_Axis;
         out->lefttrigger.target = current_axis++;
     }
 
-    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_CONTROLLER_AXIS_TRIGGERRIGHT))) {
+    if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_GAMEPAD_AXIS_RIGHT_TRIGGER))) {
         out->righttrigger.kind = EMappingKind_Axis;
         out->righttrigger.target = current_axis++;
     }
@@ -740,13 +727,13 @@ VIRTUAL_JoystickGetGamepadMapping(int device_index, SDL_GamepadMapping *out)
     return SDL_TRUE;
 }
 
-SDL_JoystickDriver SDL_VIRTUAL_JoystickDriver =
-{
+SDL_JoystickDriver SDL_VIRTUAL_JoystickDriver = {
     VIRTUAL_JoystickInit,
     VIRTUAL_JoystickGetCount,
     VIRTUAL_JoystickDetect,
     VIRTUAL_JoystickGetDeviceName,
     VIRTUAL_JoystickGetDevicePath,
+    VIRTUAL_JoystickGetDeviceSteamVirtualGamepadSlot,
     VIRTUAL_JoystickGetDevicePlayerIndex,
     VIRTUAL_JoystickSetDevicePlayerIndex,
     VIRTUAL_JoystickGetDeviceGUID,
@@ -765,5 +752,3 @@ SDL_JoystickDriver SDL_VIRTUAL_JoystickDriver =
 };
 
 #endif /* SDL_JOYSTICK_VIRTUAL */
-
-/* vi: set ts=4 sw=4 expandtab: */

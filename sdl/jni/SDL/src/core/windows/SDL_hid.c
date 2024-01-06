@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,12 +18,11 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../../SDL_internal.h"
+#include "SDL_internal.h"
 
 #ifndef __WINRT__
 
 #include "SDL_hid.h"
-
 
 HidD_GetString_t SDL_HidD_GetManufacturerString;
 HidD_GetString_t SDL_HidD_GetProductString;
@@ -36,14 +35,12 @@ HidP_GetData_t SDL_HidP_GetData;
 static HMODULE s_pHIDDLL = 0;
 static int s_HIDDLLRefCount = 0;
 
-
-int
-WIN_LoadHIDDLL(void)
+int WIN_LoadHIDDLL(void)
 {
     if (s_pHIDDLL) {
         SDL_assert(s_HIDDLLRefCount > 0);
         s_HIDDLLRefCount++;
-        return 0;  /* already loaded */
+        return 0; /* already loaded */
     }
 
     s_pHIDDLL = LoadLibrary(TEXT("hid.dll"));
@@ -71,8 +68,7 @@ WIN_LoadHIDDLL(void)
     return 0;
 }
 
-void
-WIN_UnloadHIDDLL(void)
+void WIN_UnloadHIDDLL(void)
 {
     if (s_pHIDDLL) {
         SDL_assert(s_HIDDLLRefCount > 0);
@@ -86,5 +82,3 @@ WIN_UnloadHIDDLL(void)
 }
 
 #endif /* !__WINRT__ */
-
-/* vi: set ts=4 sw=4 expandtab: */

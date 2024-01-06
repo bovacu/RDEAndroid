@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,19 +18,17 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../../SDL_internal.h"
+#include "SDL_internal.h"
 
-#if SDL_VIDEO_RENDER_SW && !SDL_RENDER_DISABLED
+#if SDL_VIDEO_RENDER_SW && !defined(SDL_RENDER_DISABLED)
 
 #include "SDL_draw.h"
 #include "SDL_blendline.h"
 #include "SDL_blendpoint.h"
 
-
-static void
-SDL_BlendLine_RGB2(SDL_Surface * dst, int x1, int y1, int x2, int y2,
-                   SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
-                   SDL_bool draw_end)
+static void SDL_BlendLine_RGB2(SDL_Surface *dst, int x1, int y1, int x2, int y2,
+                               SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
+                               SDL_bool draw_end)
 {
     const SDL_PixelFormat *fmt = dst->format;
     unsigned r, g, b, a, inva;
@@ -133,10 +131,9 @@ SDL_BlendLine_RGB2(SDL_Surface * dst, int x1, int y1, int x2, int y2,
     }
 }
 
-static void
-SDL_BlendLine_RGB555(SDL_Surface * dst, int x1, int y1, int x2, int y2,
-                     SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
-                     SDL_bool draw_end)
+static void SDL_BlendLine_RGB555(SDL_Surface *dst, int x1, int y1, int x2, int y2,
+                                 SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
+                                 SDL_bool draw_end)
 {
     unsigned r, g, b, a, inva;
 
@@ -238,10 +235,9 @@ SDL_BlendLine_RGB555(SDL_Surface * dst, int x1, int y1, int x2, int y2,
     }
 }
 
-static void
-SDL_BlendLine_RGB565(SDL_Surface * dst, int x1, int y1, int x2, int y2,
-                     SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
-                     SDL_bool draw_end)
+static void SDL_BlendLine_RGB565(SDL_Surface *dst, int x1, int y1, int x2, int y2,
+                                 SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
+                                 SDL_bool draw_end)
 {
     unsigned r, g, b, a, inva;
 
@@ -343,10 +339,9 @@ SDL_BlendLine_RGB565(SDL_Surface * dst, int x1, int y1, int x2, int y2,
     }
 }
 
-static void
-SDL_BlendLine_RGB4(SDL_Surface * dst, int x1, int y1, int x2, int y2,
-                   SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
-                   SDL_bool draw_end)
+static void SDL_BlendLine_RGB4(SDL_Surface *dst, int x1, int y1, int x2, int y2,
+                               SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
+                               SDL_bool draw_end)
 {
     const SDL_PixelFormat *fmt = dst->format;
     unsigned r, g, b, a, inva;
@@ -449,10 +444,9 @@ SDL_BlendLine_RGB4(SDL_Surface * dst, int x1, int y1, int x2, int y2,
     }
 }
 
-static void
-SDL_BlendLine_RGBA4(SDL_Surface * dst, int x1, int y1, int x2, int y2,
-                    SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
-                    SDL_bool draw_end)
+static void SDL_BlendLine_RGBA4(SDL_Surface *dst, int x1, int y1, int x2, int y2,
+                                SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
+                                SDL_bool draw_end)
 {
     const SDL_PixelFormat *fmt = dst->format;
     unsigned r, g, b, a, inva;
@@ -555,10 +549,9 @@ SDL_BlendLine_RGBA4(SDL_Surface * dst, int x1, int y1, int x2, int y2,
     }
 }
 
-static void
-SDL_BlendLine_RGB888(SDL_Surface * dst, int x1, int y1, int x2, int y2,
-                     SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
-                     SDL_bool draw_end)
+static void SDL_BlendLine_XRGB8888(SDL_Surface *dst, int x1, int y1, int x2, int y2,
+                                 SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
+                                 SDL_bool draw_end)
 {
     unsigned r, g, b, a, inva;
 
@@ -578,92 +571,91 @@ SDL_BlendLine_RGB888(SDL_Surface * dst, int x1, int y1, int x2, int y2,
     if (y1 == y2) {
         switch (blendMode) {
         case SDL_BLENDMODE_BLEND:
-            HLINE(Uint32, DRAW_SETPIXEL_BLEND_RGB888, draw_end);
+            HLINE(Uint32, DRAW_SETPIXEL_BLEND_XRGB8888, draw_end);
             break;
         case SDL_BLENDMODE_ADD:
-            HLINE(Uint32, DRAW_SETPIXEL_ADD_RGB888, draw_end);
+            HLINE(Uint32, DRAW_SETPIXEL_ADD_XRGB8888, draw_end);
             break;
         case SDL_BLENDMODE_MOD:
-            HLINE(Uint32, DRAW_SETPIXEL_MOD_RGB888, draw_end);
+            HLINE(Uint32, DRAW_SETPIXEL_MOD_XRGB8888, draw_end);
             break;
         case SDL_BLENDMODE_MUL:
-            HLINE(Uint32, DRAW_SETPIXEL_MUL_RGB888, draw_end);
+            HLINE(Uint32, DRAW_SETPIXEL_MUL_XRGB8888, draw_end);
             break;
         default:
-            HLINE(Uint32, DRAW_SETPIXEL_RGB888, draw_end);
+            HLINE(Uint32, DRAW_SETPIXEL_XRGB8888, draw_end);
             break;
         }
     } else if (x1 == x2) {
         switch (blendMode) {
         case SDL_BLENDMODE_BLEND:
-            VLINE(Uint32, DRAW_SETPIXEL_BLEND_RGB888, draw_end);
+            VLINE(Uint32, DRAW_SETPIXEL_BLEND_XRGB8888, draw_end);
             break;
         case SDL_BLENDMODE_ADD:
-            VLINE(Uint32, DRAW_SETPIXEL_ADD_RGB888, draw_end);
+            VLINE(Uint32, DRAW_SETPIXEL_ADD_XRGB8888, draw_end);
             break;
         case SDL_BLENDMODE_MOD:
-            VLINE(Uint32, DRAW_SETPIXEL_MOD_RGB888, draw_end);
+            VLINE(Uint32, DRAW_SETPIXEL_MOD_XRGB8888, draw_end);
             break;
         case SDL_BLENDMODE_MUL:
-            VLINE(Uint32, DRAW_SETPIXEL_MUL_RGB888, draw_end);
+            VLINE(Uint32, DRAW_SETPIXEL_MUL_XRGB8888, draw_end);
             break;
         default:
-            VLINE(Uint32, DRAW_SETPIXEL_RGB888, draw_end);
+            VLINE(Uint32, DRAW_SETPIXEL_XRGB8888, draw_end);
             break;
         }
     } else if (ABS(x1 - x2) == ABS(y1 - y2)) {
         switch (blendMode) {
         case SDL_BLENDMODE_BLEND:
-            DLINE(Uint32, DRAW_SETPIXEL_BLEND_RGB888, draw_end);
+            DLINE(Uint32, DRAW_SETPIXEL_BLEND_XRGB8888, draw_end);
             break;
         case SDL_BLENDMODE_ADD:
-            DLINE(Uint32, DRAW_SETPIXEL_ADD_RGB888, draw_end);
+            DLINE(Uint32, DRAW_SETPIXEL_ADD_XRGB8888, draw_end);
             break;
         case SDL_BLENDMODE_MOD:
-            DLINE(Uint32, DRAW_SETPIXEL_MOD_RGB888, draw_end);
+            DLINE(Uint32, DRAW_SETPIXEL_MOD_XRGB8888, draw_end);
             break;
         case SDL_BLENDMODE_MUL:
-            DLINE(Uint32, DRAW_SETPIXEL_MUL_RGB888, draw_end);
+            DLINE(Uint32, DRAW_SETPIXEL_MUL_XRGB8888, draw_end);
             break;
         default:
-            DLINE(Uint32, DRAW_SETPIXEL_RGB888, draw_end);
+            DLINE(Uint32, DRAW_SETPIXEL_XRGB8888, draw_end);
             break;
         }
     } else {
         switch (blendMode) {
         case SDL_BLENDMODE_BLEND:
             AALINE(x1, y1, x2, y2,
-                   DRAW_SETPIXELXY_BLEND_RGB888, DRAW_SETPIXELXY_BLEND_RGB888,
+                   DRAW_SETPIXELXY_BLEND_XRGB8888, DRAW_SETPIXELXY_BLEND_XRGB8888,
                    draw_end);
             break;
         case SDL_BLENDMODE_ADD:
             AALINE(x1, y1, x2, y2,
-                   DRAW_SETPIXELXY_ADD_RGB888, DRAW_SETPIXELXY_ADD_RGB888,
+                   DRAW_SETPIXELXY_ADD_XRGB8888, DRAW_SETPIXELXY_ADD_XRGB8888,
                    draw_end);
             break;
         case SDL_BLENDMODE_MOD:
             AALINE(x1, y1, x2, y2,
-                   DRAW_SETPIXELXY_MOD_RGB888, DRAW_SETPIXELXY_MOD_RGB888,
+                   DRAW_SETPIXELXY_MOD_XRGB8888, DRAW_SETPIXELXY_MOD_XRGB8888,
                    draw_end);
             break;
         case SDL_BLENDMODE_MUL:
             AALINE(x1, y1, x2, y2,
-                   DRAW_SETPIXELXY_MUL_RGB888, DRAW_SETPIXELXY_MUL_RGB888,
+                   DRAW_SETPIXELXY_MUL_XRGB8888, DRAW_SETPIXELXY_MUL_XRGB8888,
                    draw_end);
             break;
         default:
             AALINE(x1, y1, x2, y2,
-                   DRAW_SETPIXELXY_RGB888, DRAW_SETPIXELXY_BLEND_RGB888,
+                   DRAW_SETPIXELXY_XRGB8888, DRAW_SETPIXELXY_BLEND_XRGB8888,
                    draw_end);
             break;
         }
     }
 }
 
-static void
-SDL_BlendLine_ARGB8888(SDL_Surface * dst, int x1, int y1, int x2, int y2,
-                       SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
-                       SDL_bool draw_end)
+static void SDL_BlendLine_ARGB8888(SDL_Surface *dst, int x1, int y1, int x2, int y2,
+                                   SDL_BlendMode blendMode, Uint8 _r, Uint8 _g, Uint8 _b, Uint8 _a,
+                                   SDL_bool draw_end)
 {
     unsigned r, g, b, a, inva;
 
@@ -765,14 +757,13 @@ SDL_BlendLine_ARGB8888(SDL_Surface * dst, int x1, int y1, int x2, int y2,
     }
 }
 
-typedef void (*BlendLineFunc) (SDL_Surface * dst,
-                               int x1, int y1, int x2, int y2,
-                               SDL_BlendMode blendMode,
-                               Uint8 r, Uint8 g, Uint8 b, Uint8 a,
-                               SDL_bool draw_end);
+typedef void (*BlendLineFunc)(SDL_Surface *dst,
+                              int x1, int y1, int x2, int y2,
+                              SDL_BlendMode blendMode,
+                              Uint8 r, Uint8 g, Uint8 b, Uint8 a,
+                              SDL_bool draw_end);
 
-static BlendLineFunc
-SDL_CalculateBlendLineFunc(const SDL_PixelFormat * fmt)
+static BlendLineFunc SDL_CalculateBlendLineFunc(const SDL_PixelFormat *fmt)
 {
     switch (fmt->BytesPerPixel) {
     case 2:
@@ -789,7 +780,7 @@ SDL_CalculateBlendLineFunc(const SDL_PixelFormat * fmt)
             if (fmt->Amask) {
                 return SDL_BlendLine_ARGB8888;
             } else {
-                return SDL_BlendLine_RGB888;
+                return SDL_BlendLine_XRGB8888;
             }
         } else {
             if (fmt->Amask) {
@@ -802,9 +793,8 @@ SDL_CalculateBlendLineFunc(const SDL_PixelFormat * fmt)
     return NULL;
 }
 
-int
-SDL_BlendLine(SDL_Surface * dst, int x1, int y1, int x2, int y2,
-              SDL_BlendMode blendMode, Uint8 r, Uint8 g, Uint8 b, Uint8 a)
+int SDL_BlendLine(SDL_Surface *dst, int x1, int y1, int x2, int y2,
+                  SDL_BlendMode blendMode, Uint8 r, Uint8 g, Uint8 b, Uint8 a)
 {
     BlendLineFunc func;
 
@@ -819,7 +809,7 @@ SDL_BlendLine(SDL_Surface * dst, int x1, int y1, int x2, int y2,
 
     /* Perform clipping */
     /* FIXME: We don't actually want to clip, as it may change line slope */
-    if (!SDL_IntersectRectAndLine(&dst->clip_rect, &x1, &y1, &x2, &y2)) {
+    if (!SDL_GetRectAndLineIntersection(&dst->clip_rect, &x1, &y1, &x2, &y2)) {
         return 0;
     }
 
@@ -827,9 +817,8 @@ SDL_BlendLine(SDL_Surface * dst, int x1, int y1, int x2, int y2,
     return 0;
 }
 
-int
-SDL_BlendLines(SDL_Surface * dst, const SDL_Point * points, int count,
-               SDL_BlendMode blendMode, Uint8 r, Uint8 g, Uint8 b, Uint8 a)
+int SDL_BlendLines(SDL_Surface *dst, const SDL_Point *points, int count,
+                   SDL_BlendMode blendMode, Uint8 r, Uint8 g, Uint8 b, Uint8 a)
 {
     int i;
     int x1, y1;
@@ -847,14 +836,14 @@ SDL_BlendLines(SDL_Surface * dst, const SDL_Point * points, int count,
     }
 
     for (i = 1; i < count; ++i) {
-        x1 = points[i-1].x;
-        y1 = points[i-1].y;
+        x1 = points[i - 1].x;
+        y1 = points[i - 1].y;
         x2 = points[i].x;
         y2 = points[i].y;
 
         /* Perform clipping */
         /* FIXME: We don't actually want to clip, as it may change line slope */
-        if (!SDL_IntersectRectAndLine(&dst->clip_rect, &x1, &y1, &x2, &y2)) {
+        if (!SDL_GetRectAndLineIntersection(&dst->clip_rect, &x1, &y1, &x2, &y2)) {
             continue;
         }
 
@@ -863,13 +852,11 @@ SDL_BlendLines(SDL_Surface * dst, const SDL_Point * points, int count,
 
         func(dst, x1, y1, x2, y2, blendMode, r, g, b, a, draw_end);
     }
-    if (points[0].x != points[count-1].x || points[0].y != points[count-1].y) {
-        SDL_BlendPoint(dst, points[count-1].x, points[count-1].y,
+    if (points[0].x != points[count - 1].x || points[0].y != points[count - 1].y) {
+        SDL_BlendPoint(dst, points[count - 1].x, points[count - 1].y,
                        blendMode, r, g, b, a);
     }
     return 0;
 }
 
 #endif /* SDL_VIDEO_RENDER_SW && !SDL_RENDER_DISABLED */
-
-/* vi: set ts=4 sw=4 expandtab: */

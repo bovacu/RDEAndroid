@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,14 +18,16 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../../SDL_internal.h"
+#include "SDL_internal.h"
 
-#if SDL_VIDEO_DRIVER_WINDOWS && !defined(__XBOXONE__) && !defined(__XBOXSERIES__)
+#if defined(SDL_VIDEO_DRIVER_WINDOWS) && !defined(__XBOXONE__) && !defined(__XBOXSERIES__)
 
 #include "SDL_windowsvideo.h"
+#include "SDL_windowsevents.h"
 
+#include "../SDL_video_c.h"
 #include "../../events/SDL_mouse_c.h"
-
+#include "../../joystick/usb_ids.h"
 
 DWORD SDL_last_warp_time = 0;
 HCURSOR SDL_cursor = NULL;
@@ -33,131 +35,295 @@ static SDL_Cursor *SDL_blank_cursor = NULL;
 
 static int rawInputEnableCount = 0;
 
-static int
-ToggleRawInput(SDL_bool enabled)
+typedef struct
 {
-    RAWINPUTDEVICE rawMouse = { 0x01, 0x02, 0, NULL }; /* Mouse: UsagePage = 1, Usage = 2 */
+    HANDLE ready_event;
+    HANDLE done_event;
+    HANDLE thread;
+} RawMouseThreadData;
+
+static RawMouseThreadData thread_data = {
+    INVALID_HANDLE_VALUE,
+    INVALID_HANDLE_VALUE,
+    INVALID_HANDLE_VALUE
+};
+
+static DWORD WINAPI WIN_RawMouseThread(LPVOID param)
+{
+    RAWINPUTDEVICE rawMouse;
+    HWND window;
+
+    window = CreateWindowEx(0, TEXT("Message"), NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
+    if (!window) {
+        return 0;
+    }
+
+    rawMouse.usUsagePage = USB_USAGEPAGE_GENERIC_DESKTOP;
+    rawMouse.usUsage = USB_USAGE_GENERIC_MOUSE;
+    rawMouse.dwFlags = 0;
+    rawMouse.hwndTarget = window;
+
+    if (!RegisterRawInputDevices(&rawMouse, 1, sizeof(rawMouse))) {
+        DestroyWindow(window);
+        return 0;
+    }
+
+    /* Make sure we get mouse events as soon as possible */
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+
+    /* Tell the parent we're ready to go! */
+    SetEvent(thread_data.ready_event);
+
+    for ( ; ; ) {
+        if (MsgWaitForMultipleObjects(1, &thread_data.done_event, 0, INFINITE, QS_RAWINPUT) != WAIT_OBJECT_0 + 1) {
+            break;
+        }
+
+        /* Clear the queue status so MsgWaitForMultipleObjects() will wait again */
+        (void)GetQueueStatus(QS_RAWINPUT);
+
+        WIN_PollRawMouseInput();
+    }
+
+    rawMouse.dwFlags |= RIDEV_REMOVE;
+    RegisterRawInputDevices(&rawMouse, 1, sizeof(rawMouse));
+
+    DestroyWindow(window);
+
+    return 0;
+}
+
+static void CleanupRawMouseThreadData(void)
+{
+    if (thread_data.thread != INVALID_HANDLE_VALUE) {
+        SetEvent(thread_data.done_event);
+        WaitForSingleObject(thread_data.thread, 500);
+        CloseHandle(thread_data.thread);
+        thread_data.thread = INVALID_HANDLE_VALUE;
+    }
+
+    if (thread_data.ready_event != INVALID_HANDLE_VALUE) {
+        CloseHandle(thread_data.ready_event);
+        thread_data.ready_event = INVALID_HANDLE_VALUE;
+    }
+
+    if (thread_data.done_event != INVALID_HANDLE_VALUE) {
+        CloseHandle(thread_data.done_event);
+        thread_data.done_event = INVALID_HANDLE_VALUE;
+    }
+}
+
+static int ToggleRawInput(SDL_bool enabled)
+{
+    int result = -1;
 
     if (enabled) {
         rawInputEnableCount++;
         if (rawInputEnableCount > 1) {
-            return 0;  /* already done. */
+            return 0; /* already done. */
         }
     } else {
         if (rawInputEnableCount == 0) {
-            return 0;  /* already done. */
+            return 0; /* already done. */
         }
         rawInputEnableCount--;
         if (rawInputEnableCount > 0) {
-            return 0;  /* not time to disable yet */
+            return 0; /* not time to disable yet */
         }
     }
 
-    if (!enabled) {
-        rawMouse.dwFlags |= RIDEV_REMOVE;
+    if (enabled) {
+        HANDLE handles[2];
+
+        thread_data.ready_event = CreateEvent(NULL, FALSE, FALSE, NULL);
+        if (thread_data.ready_event == INVALID_HANDLE_VALUE) {
+            WIN_SetError("CreateEvent");
+            goto done;
+        }
+
+        thread_data.done_event = CreateEvent(NULL, FALSE, FALSE, NULL);
+        if (thread_data.done_event == INVALID_HANDLE_VALUE) {
+            WIN_SetError("CreateEvent");
+            goto done;
+        }
+
+        thread_data.thread = CreateThread(NULL, 0, WIN_RawMouseThread, &thread_data, 0, NULL);
+        if (thread_data.thread == INVALID_HANDLE_VALUE) {
+            WIN_SetError("CreateThread");
+            goto done;
+        }
+
+        /* Wait for the thread to signal ready or exit */
+        handles[0] = thread_data.ready_event;
+        handles[1] = thread_data.thread;
+        if (WaitForMultipleObjects(2, handles, FALSE, INFINITE) != WAIT_OBJECT_0) {
+            SDL_SetError("Couldn't set up raw input handling");
+            goto done;
+        }
+        result = 0;
+    } else {
+        CleanupRawMouseThreadData();
+        result = 0;
     }
 
-    /* (Un)register raw input for mice */
-    if (RegisterRawInputDevices(&rawMouse, 1, sizeof(RAWINPUTDEVICE)) == FALSE) {
-        /* Reset the enable count, otherwise subsequent enable calls will
-           believe raw input is enabled */
+done:
+    if (enabled && result < 0) {
+        CleanupRawMouseThreadData();
+
+        /* Reset rawInputEnableCount so we can try again */
         rawInputEnableCount = 0;
-
-        /* Only return an error when registering. If we unregister and fail,
-           then it's probably that we unregistered twice. That's OK. */
-        if (enabled) {
-            return SDL_Unsupported();
-        }
     }
-    return 0;
+    return result;
 }
 
-
-static SDL_Cursor *
-WIN_CreateDefaultCursor()
+static SDL_Cursor *WIN_CreateDefaultCursor()
 {
-    SDL_Cursor *cursor;
-
-    cursor = SDL_calloc(1, sizeof(*cursor));
+    SDL_Cursor *cursor = SDL_calloc(1, sizeof(*cursor));
     if (cursor) {
         cursor->driverdata = LoadCursor(NULL, IDC_ARROW);
-    } else {
-        SDL_OutOfMemory();
     }
 
     return cursor;
 }
 
-static SDL_Cursor *
-WIN_CreateCursor(SDL_Surface * surface, int hot_x, int hot_y)
+static SDL_bool IsMonochromeSurface(SDL_Surface *surface)
 {
-    /* msdn says cursor mask has to be padded out to word alignment. Not sure
-        if that means machine word or WORD, but this handles either case. */
-    const size_t pad = (sizeof (size_t) * 8);  /* 32 or 64, or whatever. */
-    SDL_Cursor *cursor;
-    HICON hicon;
-    HICON hcursor;
-    HDC hdc;
-    BITMAPV4HEADER bmh;
-    LPVOID pixels;
-    LPVOID maskbits;
-    size_t maskbitslen;
-    SDL_bool isstack;
-    ICONINFO ii;
+    int x, y;
+    Uint8 r, g, b, a;
 
-    SDL_zero(bmh);
-    bmh.bV4Size = sizeof(bmh);
-    bmh.bV4Width = surface->w;
-    bmh.bV4Height = -surface->h; /* Invert the image */
-    bmh.bV4Planes = 1;
-    bmh.bV4BitCount = 32;
-    bmh.bV4V4Compression = BI_BITFIELDS;
-    bmh.bV4AlphaMask = 0xFF000000;
-    bmh.bV4RedMask   = 0x00FF0000;
-    bmh.bV4GreenMask = 0x0000FF00;
-    bmh.bV4BlueMask  = 0x000000FF;
+    SDL_assert(surface->format->format == SDL_PIXELFORMAT_ARGB8888);
 
-    maskbitslen = ((surface->w + (pad - (surface->w % pad))) / 8) * surface->h;
-    maskbits = SDL_small_alloc(Uint8, maskbitslen, &isstack);
-    if (maskbits == NULL) {
-        SDL_OutOfMemory();
+    for (y = 0; y < surface->h; y++) {
+        for (x = 0; x < surface->w; x++) {
+            SDL_ReadSurfacePixel(surface, x, y, &r, &g, &b, &a);
+
+            /* Black or white pixel. */
+            if (!((r == 0x00 && g == 0x00 && b == 0x00) || (r == 0xff && g == 0xff && b == 0xff))) {
+                return SDL_FALSE;
+            }
+
+            /* Transparent or opaque pixel. */
+            if (!(a == 0x00 || a == 0xff)) {
+                return SDL_FALSE;
+            }
+        }
+    }
+
+    return SDL_TRUE;
+}
+
+static HBITMAP CreateColorBitmap(SDL_Surface *surface)
+{
+    HBITMAP bitmap;
+    BITMAPINFO bi;
+    void *pixels;
+
+    SDL_assert(surface->format->format == SDL_PIXELFORMAT_ARGB8888);
+
+    SDL_zero(bi);
+    bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bi.bmiHeader.biWidth = surface->w;
+    bi.bmiHeader.biHeight = -surface->h; /* Invert height to make the top-down DIB. */
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+
+    bitmap = CreateDIBSection(NULL, &bi, DIB_RGB_COLORS, &pixels, NULL, 0);
+    if (!bitmap || !pixels) {
+        WIN_SetError("CreateDIBSection()");
         return NULL;
     }
 
-    /* AND the cursor against full bits: no change. We already have alpha. */
-    SDL_memset(maskbits, 0xFF, maskbitslen);
+    SDL_memcpy(pixels, surface->pixels, surface->pitch * surface->h);
 
-    hdc = GetDC(NULL);
+    return bitmap;
+}
+
+/* Generate bitmap with a mask and optional monochrome image data.
+ *
+ * For info on the expected mask format see:
+ * https://devblogs.microsoft.com/oldnewthing/20101018-00/?p=12513
+ */
+static HBITMAP CreateMaskBitmap(SDL_Surface *surface, SDL_bool is_monochrome)
+{
+    HBITMAP bitmap;
+    SDL_bool isstack;
+    void *pixels;
+    int x, y;
+    Uint8 r, g, b, a;
+    Uint8 *dst;
+    const int pitch = ((surface->w + 15) & ~15) / 8;
+    const int size = pitch * surface->h;
+    static const unsigned char masks[] = { 0x80, 0x40, 0x20, 0x10, 0x8, 0x4, 0x2, 0x1 };
+
+    SDL_assert(surface->format->format == SDL_PIXELFORMAT_ARGB8888);
+
+    pixels = SDL_small_alloc(Uint8, size * (is_monochrome ? 2 : 1), &isstack);
+    if (!pixels) {
+        return NULL;
+    }
+
+    dst = pixels;
+
+    /* Make the mask completely transparent. */
+    SDL_memset(dst, 0xff, size);
+    if (is_monochrome) {
+        SDL_memset(dst + size, 0x00, size);
+    }
+
+    for (y = 0; y < surface->h; y++, dst += pitch) {
+        for (x = 0; x < surface->w; x++) {
+            SDL_ReadSurfacePixel(surface, x, y, &r, &g, &b, &a);
+
+            if (a != 0) {
+                /* Reset bit of an opaque pixel. */
+                dst[x >> 3] &= ~masks[x & 7];
+            }
+
+            if (is_monochrome && !(r == 0x00 && g == 0x00 && b == 0x00)) {
+                /* Set bit of white or inverted pixel. */
+                dst[size + (x >> 3)] |= masks[x & 7];
+            }
+        }
+    }
+
+    bitmap = CreateBitmap(surface->w, surface->h * (is_monochrome ? 2 : 1), 1, 1, pixels);
+    SDL_small_free(pixels, isstack);
+    if (!bitmap) {
+        WIN_SetError("CreateBitmap()");
+        return NULL;
+    }
+
+    return bitmap;
+}
+
+static SDL_Cursor *WIN_CreateCursor(SDL_Surface *surface, int hot_x, int hot_y)
+{
+    HCURSOR hcursor;
+    SDL_Cursor *cursor;
+    ICONINFO ii;
+    SDL_bool is_monochrome = IsMonochromeSurface(surface);
+
     SDL_zero(ii);
     ii.fIcon = FALSE;
     ii.xHotspot = (DWORD)hot_x;
     ii.yHotspot = (DWORD)hot_y;
-    ii.hbmColor = CreateDIBSection(hdc, (BITMAPINFO*)&bmh, DIB_RGB_COLORS, &pixels, NULL, 0);
-    ii.hbmMask = CreateBitmap(surface->w, surface->h, 1, 1, maskbits);
-    ReleaseDC(NULL, hdc);
-    SDL_small_free(maskbits, isstack);
+    ii.hbmMask = CreateMaskBitmap(surface, is_monochrome);
+    ii.hbmColor = is_monochrome ? NULL : CreateColorBitmap(surface);
 
-    SDL_assert(surface->format->format == SDL_PIXELFORMAT_ARGB8888);
-    SDL_assert(surface->pitch == surface->w * 4);
-    SDL_memcpy(pixels, surface->pixels, surface->h * surface->pitch);
-
-    hicon = CreateIconIndirect(&ii);
-
-    DeleteObject(ii.hbmColor);
-    DeleteObject(ii.hbmMask);
-
-    if (!hicon) {
-        WIN_SetError("CreateIconIndirect()");
+    if (!ii.hbmMask || (!is_monochrome && !ii.hbmColor)) {
         return NULL;
     }
 
-    /* The cursor returned by CreateIconIndirect does not respect system cursor size
-        preference, use CopyImage to duplicate the cursor with desired sizes */
-    hcursor = CopyImage(hicon, IMAGE_CURSOR, surface->w, surface->h, 0);
-    DestroyIcon(hicon);
+    hcursor = CreateIconIndirect(&ii);
+
+    DeleteObject(ii.hbmMask);
+    if (ii.hbmColor) {
+        DeleteObject(ii.hbmColor);
+    }
 
     if (!hcursor) {
-        WIN_SetError("CopyImage()");
+        WIN_SetError("CreateIconIndirect()");
         return NULL;
     }
 
@@ -165,75 +331,115 @@ WIN_CreateCursor(SDL_Surface * surface, int hot_x, int hot_y)
     if (cursor) {
         cursor->driverdata = hcursor;
     } else {
-        DestroyIcon(hcursor);
-        SDL_OutOfMemory();
+        DestroyCursor(hcursor);
     }
 
     return cursor;
 }
 
-static SDL_Cursor *
-WIN_CreateBlankCursor()
+static SDL_Cursor *WIN_CreateBlankCursor()
 {
     SDL_Cursor *cursor = NULL;
-    SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, 32, 32, 32, SDL_PIXELFORMAT_ARGB8888);
+    SDL_Surface *surface = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_ARGB8888);
     if (surface) {
         cursor = WIN_CreateCursor(surface, 0, 0);
-        SDL_FreeSurface(surface);
+        SDL_DestroySurface(surface);
     }
     return cursor;
 }
 
-static SDL_Cursor *
-WIN_CreateSystemCursor(SDL_SystemCursor id)
+static SDL_Cursor *WIN_CreateSystemCursor(SDL_SystemCursor id)
 {
     SDL_Cursor *cursor;
     LPCTSTR name;
 
-    switch(id)
-    {
+    switch (id) {
     default:
         SDL_assert(0);
         return NULL;
-    case SDL_SYSTEM_CURSOR_ARROW:     name = IDC_ARROW; break;
-    case SDL_SYSTEM_CURSOR_IBEAM:     name = IDC_IBEAM; break;
-    case SDL_SYSTEM_CURSOR_WAIT:      name = IDC_WAIT; break;
-    case SDL_SYSTEM_CURSOR_CROSSHAIR: name = IDC_CROSS; break;
-    case SDL_SYSTEM_CURSOR_WAITARROW: name = IDC_WAIT; break;
-    case SDL_SYSTEM_CURSOR_SIZENWSE:  name = IDC_SIZENWSE; break;
-    case SDL_SYSTEM_CURSOR_SIZENESW:  name = IDC_SIZENESW; break;
-    case SDL_SYSTEM_CURSOR_SIZEWE:    name = IDC_SIZEWE; break;
-    case SDL_SYSTEM_CURSOR_SIZENS:    name = IDC_SIZENS; break;
-    case SDL_SYSTEM_CURSOR_SIZEALL:   name = IDC_SIZEALL; break;
-    case SDL_SYSTEM_CURSOR_NO:        name = IDC_NO; break;
-    case SDL_SYSTEM_CURSOR_HAND:      name = IDC_HAND; break;
+    case SDL_SYSTEM_CURSOR_ARROW:
+        name = IDC_ARROW;
+        break;
+    case SDL_SYSTEM_CURSOR_IBEAM:
+        name = IDC_IBEAM;
+        break;
+    case SDL_SYSTEM_CURSOR_WAIT:
+        name = IDC_WAIT;
+        break;
+    case SDL_SYSTEM_CURSOR_CROSSHAIR:
+        name = IDC_CROSS;
+        break;
+    case SDL_SYSTEM_CURSOR_WAITARROW:
+        name = IDC_WAIT;
+        break;
+    case SDL_SYSTEM_CURSOR_SIZENWSE:
+        name = IDC_SIZENWSE;
+        break;
+    case SDL_SYSTEM_CURSOR_SIZENESW:
+        name = IDC_SIZENESW;
+        break;
+    case SDL_SYSTEM_CURSOR_SIZEWE:
+        name = IDC_SIZEWE;
+        break;
+    case SDL_SYSTEM_CURSOR_SIZENS:
+        name = IDC_SIZENS;
+        break;
+    case SDL_SYSTEM_CURSOR_SIZEALL:
+        name = IDC_SIZEALL;
+        break;
+    case SDL_SYSTEM_CURSOR_NO:
+        name = IDC_NO;
+        break;
+    case SDL_SYSTEM_CURSOR_HAND:
+        name = IDC_HAND;
+        break;
+    case SDL_SYSTEM_CURSOR_WINDOW_TOPLEFT:
+        name = IDC_SIZENWSE;
+        break;
+    case SDL_SYSTEM_CURSOR_WINDOW_TOP:
+        name = IDC_SIZENS;
+        break;
+    case SDL_SYSTEM_CURSOR_WINDOW_TOPRIGHT:
+        name = IDC_SIZENESW;
+        break;
+    case SDL_SYSTEM_CURSOR_WINDOW_RIGHT:
+        name = IDC_SIZEWE;
+        break;
+    case SDL_SYSTEM_CURSOR_WINDOW_BOTTOMRIGHT:
+        name = IDC_SIZENWSE;
+        break;
+    case SDL_SYSTEM_CURSOR_WINDOW_BOTTOM:
+        name = IDC_SIZENS;
+        break;
+    case SDL_SYSTEM_CURSOR_WINDOW_BOTTOMLEFT:
+        name = IDC_SIZENESW;
+        break;
+    case SDL_SYSTEM_CURSOR_WINDOW_LEFT:
+        name = IDC_SIZEWE;
+        break;
     }
 
     cursor = SDL_calloc(1, sizeof(*cursor));
     if (cursor) {
-        HICON hicon;
+        HCURSOR hcursor;
 
-        hicon = LoadCursor(NULL, name);
+        hcursor = LoadCursor(NULL, name);
 
-        cursor->driverdata = hicon;
-    } else {
-        SDL_OutOfMemory();
+        cursor->driverdata = hcursor;
     }
 
     return cursor;
 }
 
-static void
-WIN_FreeCursor(SDL_Cursor * cursor)
+static void WIN_FreeCursor(SDL_Cursor *cursor)
 {
-    HICON hicon = (HICON)cursor->driverdata;
+    HCURSOR hcursor = (HCURSOR)cursor->driverdata;
 
-    DestroyIcon(hicon);
+    DestroyCursor(hcursor);
     SDL_free(cursor);
 }
 
-static int
-WIN_ShowCursor(SDL_Cursor * cursor)
+static int WIN_ShowCursor(SDL_Cursor *cursor)
 {
     if (!cursor) {
         cursor = SDL_blank_cursor;
@@ -249,71 +455,73 @@ WIN_ShowCursor(SDL_Cursor * cursor)
     return 0;
 }
 
-void
-WIN_SetCursorPos(int x, int y)
+void WIN_SetCursorPos(int x, int y)
 {
     /* We need to jitter the value because otherwise Windows will occasionally inexplicably ignore the SetCursorPos() or SendInput() */
     SetCursorPos(x, y);
-    SetCursorPos(x+1, y);
+    SetCursorPos(x + 1, y);
     SetCursorPos(x, y);
 
     /* Flush any mouse motion prior to or associated with this warp */
+#ifdef _MSC_VER /* We explicitly want to use GetTickCount(), not GetTickCount64() */
+#pragma warning(push)
+#pragma warning(disable : 28159)
+#endif
     SDL_last_warp_time = GetTickCount();
     if (!SDL_last_warp_time) {
         SDL_last_warp_time = 1;
     }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 }
 
-static void
-WIN_WarpMouse(SDL_Window * window, int x, int y)
+static int WIN_WarpMouse(SDL_Window *window, float x, float y)
 {
-    SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
+    SDL_WindowData *data = window->driverdata;
     HWND hwnd = data->hwnd;
     POINT pt;
 
     /* Don't warp the mouse while we're doing a modal interaction */
     if (data->in_title_click || data->focus_click_pending) {
-        return;
+        return 0;
     }
 
-    pt.x = x;
-    pt.y = y;
+    pt.x = (int)SDL_roundf(x);
+    pt.y = (int)SDL_roundf(y);
     ClientToScreen(hwnd, &pt);
     WIN_SetCursorPos(pt.x, pt.y);
 
     /* Send the exact mouse motion associated with this warp */
-    SDL_SendMouseMotion(window, SDL_GetMouse()->mouseID, 0, x, y);
+    SDL_SendMouseMotion(0, window, SDL_GetMouse()->mouseID, 0, x, y);
+    return 0;
 }
 
-static int
-WIN_WarpMouseGlobal(int x, int y)
+static int WIN_WarpMouseGlobal(float x, float y)
 {
     POINT pt;
 
-    WIN_ScreenPointFromSDL(&x, &y, NULL);
-    pt.x = x;
-    pt.y = y;
+    pt.x = (int)SDL_roundf(x);
+    pt.y = (int)SDL_roundf(y);
     SetCursorPos(pt.x, pt.y);
     return 0;
 }
 
-static int
-WIN_SetRelativeMouseMode(SDL_bool enabled)
+static int WIN_SetRelativeMouseMode(SDL_bool enabled)
 {
     return ToggleRawInput(enabled);
 }
 
-static int
-WIN_CaptureMouse(SDL_Window *window)
+static int WIN_CaptureMouse(SDL_Window *window)
 {
     if (window) {
-        SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
+        SDL_WindowData *data = window->driverdata;
         SetCapture(data->hwnd);
     } else {
         SDL_Window *focus_window = SDL_GetMouseFocus();
-       
+
         if (focus_window) {
-            SDL_WindowData *data = (SDL_WindowData *)focus_window->driverdata;
+            SDL_WindowData *data = focus_window->driverdata;
             if (!data->mouse_tracked) {
                 SDL_SetMouseFocus(NULL);
             }
@@ -324,17 +532,15 @@ WIN_CaptureMouse(SDL_Window *window)
     return 0;
 }
 
-static Uint32
-WIN_GetGlobalMouseState(int *x, int *y)
+static Uint32 WIN_GetGlobalMouseState(float *x, float *y)
 {
     Uint32 retval = 0;
     POINT pt = { 0, 0 };
     SDL_bool swapButtons = GetSystemMetrics(SM_SWAPBUTTON) != 0;
 
     GetCursorPos(&pt);
-    *x = (int) pt.x;
-    *y = (int) pt.y;
-    WIN_ScreenPointToSDL(x, y);
+    *x = (float)pt.x;
+    *y = (float)pt.y;
 
     retval |= GetAsyncKeyState(!swapButtons ? VK_LBUTTON : VK_RBUTTON) & 0x8000 ? SDL_BUTTON_LMASK : 0;
     retval |= GetAsyncKeyState(!swapButtons ? VK_RBUTTON : VK_LBUTTON) & 0x8000 ? SDL_BUTTON_RMASK : 0;
@@ -345,8 +551,7 @@ WIN_GetGlobalMouseState(int *x, int *y)
     return retval;
 }
 
-void
-WIN_InitMouse(_THIS)
+void WIN_InitMouse(SDL_VideoDevice *_this)
 {
     SDL_Mouse *mouse = SDL_GetMouse();
 
@@ -367,10 +572,9 @@ WIN_InitMouse(_THIS)
     WIN_UpdateMouseSystemScale();
 }
 
-void
-WIN_QuitMouse(_THIS)
+void WIN_QuitMouse(SDL_VideoDevice *_this)
 {
-    if (rawInputEnableCount) {  /* force RAWINPUT off here. */
+    if (rawInputEnableCount) { /* force RAWINPUT off here. */
         rawInputEnableCount = 1;
         ToggleRawInput(SDL_FALSE);
     }
@@ -385,13 +589,12 @@ WIN_QuitMouse(_THIS)
  * https://superuser.com/questions/278362/windows-mouse-acceleration-curve-smoothmousexcurve-and-smoothmouseycurve
  * http://www.esreality.com/?a=post&id=1846538/
  */
-static SDL_bool
-LoadFiveFixedPointFloats(BYTE *bytes, float *values)
+static SDL_bool LoadFiveFixedPointFloats(const BYTE *bytes, float *values)
 {
     int i;
 
     for (i = 0; i < 5; ++i) {
-        float fraction = (float)((Uint16) bytes[1] << 8 | bytes[0]) / 65535.0f;
+        float fraction = (float)((Uint16)bytes[1] << 8 | bytes[0]) / 65535.0f;
         float value = (float)(((Uint16)bytes[3] << 8) | bytes[2]) + fraction;
         *values++ = value;
         bytes += 8;
@@ -399,10 +602,9 @@ LoadFiveFixedPointFloats(BYTE *bytes, float *values)
     return SDL_TRUE;
 }
 
-static void
-WIN_SetEnhancedMouseScale(int mouse_speed)
+static void WIN_SetEnhancedMouseScale(int mouse_speed)
 {
-    float scale = (float) mouse_speed / 10.0f;
+    float scale = (float)mouse_speed / 10.0f;
     HKEY hKey;
     DWORD dwType = REG_BINARY;
     BYTE value[40];
@@ -411,10 +613,10 @@ WIN_SetEnhancedMouseScale(int mouse_speed)
     float xpoints[5];
     float ypoints[5];
     float scale_points[10];
-    const int dpi = 96; // FIXME, how do we handle different monitors with different DPI?
+    const int dpi = USER_DEFAULT_SCREEN_DPI; // FIXME, how do we handle different monitors with different DPI?
     const float display_factor = 3.5f * (150.0f / dpi);
 
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Control Panel\\Mouse", 0, KEY_READ, &hKey)  == ERROR_SUCCESS) {
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Control Panel\\Mouse", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
         if (RegQueryValueExW(hKey, L"SmoothMouseXCurve", 0, &dwType, value, &length) == ERROR_SUCCESS &&
             LoadFiveFixedPointFloats(value, xpoints) &&
             RegQueryValueExW(hKey, L"SmoothMouseYCurve", 0, &dwType, value, &length) == ERROR_SUCCESS &&
@@ -428,7 +630,7 @@ WIN_SetEnhancedMouseScale(int mouse_speed)
                 }
                 scale_points[i * 2] = xpoints[i];
                 scale_points[i * 2 + 1] = gain / display_factor;
-                //SDL_Log("Point %d = %f,%f\n", i, scale_points[i * 2], scale_points[i * 2 + 1]);
+                // SDL_Log("Point %d = %f,%f\n", i, scale_points[i * 2], scale_points[i * 2 + 1]);
             }
             SDL_SetMouseSystemScale(SDL_arraysize(scale_points), scale_points);
         }
@@ -436,8 +638,7 @@ WIN_SetEnhancedMouseScale(int mouse_speed)
     }
 }
 
-static void
-WIN_SetLinearMouseScale(int mouse_speed)
+static void WIN_SetLinearMouseScale(int mouse_speed)
 {
     static float mouse_speed_scale[] = {
         0.0f,
@@ -468,8 +669,7 @@ WIN_SetLinearMouseScale(int mouse_speed)
     }
 }
 
-void
-WIN_UpdateMouseSystemScale()
+void WIN_UpdateMouseSystemScale()
 {
     int mouse_speed;
     int params[3] = { 0, 0, 0 };
@@ -485,5 +685,3 @@ WIN_UpdateMouseSystemScale()
 }
 
 #endif /* SDL_VIDEO_DRIVER_WINDOWS */
-
-/* vi: set ts=4 sw=4 expandtab: */

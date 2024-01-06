@@ -2,6 +2,10 @@ name: Build (iOS/tvOS)
 
 on: [push, pull_request]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   Build:
     name: ${{ matrix.platform.name }}
@@ -11,8 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-        - { name: iOS, target: Static Library-iOS, sdk: iphoneos }
-        - { name: tvOS, target: Static Library-tvOS, sdk: appletvos }
+        - { name: iOS, target: SDL3, sdk: iphoneos }
+        - { name: tvOS, target: SDL3, sdk: appletvos }
 
     steps:
       - uses: actions/checkout@v3

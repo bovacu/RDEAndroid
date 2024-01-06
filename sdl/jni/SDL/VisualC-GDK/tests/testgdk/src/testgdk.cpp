@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,9 +18,10 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "SDL_test.h"
-#include "SDL_test_common.h"
+#include <SDL3/SDL_test.h>
+#include <SDL3/SDL_test_common.h>
 #include "../src/core/windows/SDL_windows.h"
+#include <SDL3/SDL_main.h>
 
 extern "C" {
 #include "../test/testutils.h"
@@ -69,7 +70,7 @@ quit(int rc)
 {
     SDL_free(sprites);
     close_audio();
-    SDL_FreeWAV(wave.sound);
+    SDL_free(wave.sound);
     SDLTest_CommonQuit(state);
     /* If rc is 0, just let main return normally rather than calling exit.
      * This allows testing of platforms where SDL_main is required and does meaningful cleanup.
@@ -86,12 +87,12 @@ open_audio()
     device = SDL_OpenAudioDevice(NULL, SDL_FALSE, &wave.spec, NULL, 0);
     if (!device) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open audio: %s\n", SDL_GetError());
-        SDL_FreeWAV(wave.sound);
+        SDL_free(wave.sound);
         quit(2);
     }
 
     /* Let the audio run */
-    SDL_PauseAudioDevice(device, SDL_FALSE);
+    SDL_PlayAudioDevice(device);
 }
 
 static void
@@ -239,26 +240,27 @@ LoadSprite(const char *file)
         /* This does the SDL_LoadBMP step repeatedly, but that's OK for test code. */
         sprites[i] = LoadTexture(state->renderers[i], file, SDL_TRUE, &sprite_w, &sprite_h);
         if (!sprites[i]) {
-            return (-1);
+            return -1;
         }
         if (SDL_SetTextureBlendMode(sprites[i], blendMode) < 0) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't set blend mode: %s\n", SDL_GetError());
             SDL_DestroyTexture(sprites[i]);
-            return (-1);
+            return -1;
         }
     }
 
     /* We're ready to roll. :) */
-    return (0);
+    return 0;
 }
 
 void
 DrawSprites(SDL_Renderer * renderer, SDL_Texture * sprite)
 {
-    SDL_Rect viewport, temp;
+    SDL_Rect viewport;
+    SDL_FRect temp;
 
     /* Query the sizes */
-    SDL_RenderGetViewport(renderer, &viewport);
+    SDL_GetRenderViewport(renderer, &viewport);
 
     /* Cycle the color and alpha, if desired */
     if (cycle_color) {
@@ -293,51 +295,51 @@ DrawSprites(SDL_Renderer * renderer, SDL_Texture * sprite)
 
     /* Test points */
     SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
-    SDL_RenderDrawPoint(renderer, 0, 0);
-    SDL_RenderDrawPoint(renderer, viewport.w-1, 0);
-    SDL_RenderDrawPoint(renderer, 0, viewport.h-1);
-    SDL_RenderDrawPoint(renderer, viewport.w-1, viewport.h-1);
+    SDL_RenderPoint(renderer, 0.0f, 0.0f);
+    SDL_RenderPoint(renderer, (float)(viewport.w - 1), 0.0f);
+    SDL_RenderPoint(renderer, 0.0f, (float)(viewport.h - 1));
+    SDL_RenderPoint(renderer, (float)(viewport.w - 1), (float)(viewport.h - 1));
 
     /* Test horizontal and vertical lines */
     SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF);
-    SDL_RenderDrawLine(renderer, 1, 0, viewport.w-2, 0);
-    SDL_RenderDrawLine(renderer, 1, viewport.h-1, viewport.w-2, viewport.h-1);
-    SDL_RenderDrawLine(renderer, 0, 1, 0, viewport.h-2);
-    SDL_RenderDrawLine(renderer, viewport.w-1, 1, viewport.w-1, viewport.h-2);
+    SDL_RenderLine(renderer, 1.0f, 0.0f, (float)(viewport.w - 2), 0.0f);
+    SDL_RenderLine(renderer, 1.0f, (float)(viewport.h - 1), (float)(viewport.w - 2), (float)(viewport.h - 1));
+    SDL_RenderLine(renderer, 0.0f, 1.0f, 0.0f, (float)(viewport.h - 2));
+    SDL_RenderLine(renderer, (float)(viewport.w - 1), 1, (float)(viewport.w - 1), (float)(viewport.h - 2));
 
     /* Test fill and copy */
     SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
-    temp.x = 1;
-    temp.y = 1;
-    temp.w = sprite_w;
-    temp.h = sprite_h;
+    temp.x = 1.0f;
+    temp.y = 1.0f;
+    temp.w = (float)sprite_w;
+    temp.h = (float)sprite_h;
     SDL_RenderFillRect(renderer, &temp);
-    SDL_RenderCopy(renderer, sprite, NULL, &temp);
-    temp.x = viewport.w-sprite_w-1;
-    temp.y = 1;
-    temp.w = sprite_w;
-    temp.h = sprite_h;
+    SDL_RenderTexture(renderer, sprite, NULL, &temp);
+    temp.x = (float)(viewport.w-sprite_w-1);
+    temp.y = 1.0f;
+    temp.w = (float)sprite_w;
+    temp.h = (float)sprite_h;
     SDL_RenderFillRect(renderer, &temp);
-    SDL_RenderCopy(renderer, sprite, NULL, &temp);
-    temp.x = 1;
-    temp.y = viewport.h-sprite_h-1;
-    temp.w = sprite_w;
-    temp.h = sprite_h;
+    SDL_RenderTexture(renderer, sprite, NULL, &temp);
+    temp.x = 1.0f;
+    temp.y = (float)(viewport.h-sprite_h-1);
+    temp.w = (float)sprite_w;
+    temp.h = (float)sprite_h;
     SDL_RenderFillRect(renderer, &temp);
-    SDL_RenderCopy(renderer, sprite, NULL, &temp);
-    temp.x = viewport.w-sprite_w-1;
-    temp.y = viewport.h-sprite_h-1;
-    temp.w = sprite_w;
-    temp.h = sprite_h;
+    SDL_RenderTexture(renderer, sprite, NULL, &temp);
+    temp.x = (float)(viewport.w-sprite_w-1);
+    temp.y = (float)(viewport.h-sprite_h-1);
+    temp.w = (float)(sprite_w);
+    temp.h = (float)(sprite_h);
     SDL_RenderFillRect(renderer, &temp);
-    SDL_RenderCopy(renderer, sprite, NULL, &temp);
+    SDL_RenderTexture(renderer, sprite, NULL, &temp);
 
     /* Test diagonal lines */
     SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF);
-    SDL_RenderDrawLine(renderer, sprite_w, sprite_h,
-                       viewport.w-sprite_w-2, viewport.h-sprite_h-2);
-    SDL_RenderDrawLine(renderer, viewport.w-sprite_w-2, sprite_h,
-                       sprite_w, viewport.h-sprite_h-2);
+    SDL_RenderLine(renderer, (float)sprite_w, (float)sprite_h,
+                   (float)(viewport.w-sprite_w-2), (float)(viewport.h-sprite_h-2));
+    SDL_RenderLine(renderer, (float)(viewport.w-sprite_w-2), (float)sprite_h,
+                   (float)sprite_w, (float)(viewport.h-sprite_h-2));
 
     /* Update the screen! */
     SDL_RenderPresent(renderer);
@@ -351,12 +353,12 @@ loop()
 
     /* Check for events */
     while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_KEYDOWN && !event.key.repeat) {
-            SDL_Log("Initial SDL_KEYDOWN: %s", SDL_GetScancodeName(event.key.keysym.scancode));
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+            SDL_Log("Initial SDL_EVENT_KEY_DOWN: %s", SDL_GetScancodeName(event.key.keysym.scancode));
         }
 #if defined(__XBOXONE__) || defined(__XBOXSERIES__)
         /* On Xbox, ignore the keydown event because the features aren't supported */
-        if (event.type != SDL_KEYDOWN) {
+        if (event.type != SDL_EVENT_KEY_DOWN) {
             SDLTest_CommonEvent(state, &event, &done);
         }
 #else
@@ -364,8 +366,9 @@ loop()
 #endif
     }
     for (i = 0; i < state->num_windows; ++i) {
-        if (state->windows[i] == NULL)
+        if (state->windows[i] == NULL) {
             continue;
+        }
         DrawSprites(state->renderers[i], sprites[i]);
     }
 }
@@ -460,7 +463,7 @@ main(int argc, char *argv[])
 
     soundname = GetResourceFilename(argc > 1 ? argv[1] : NULL, "sample.wav");
 
-    if (soundname == NULL) {
+    if (!soundname) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s\n", SDL_GetError());
         quit(1);
     }
@@ -498,5 +501,3 @@ main(int argc, char *argv[])
     SDL_free(soundname);
     return 0;
 }
-
-/* vi: set ts=4 sw=4 expandtab: */
