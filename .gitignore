@@ -24,3 +24,4 @@ apk/debug/app-debug.apk
 
 apk/debug/output-metadata.json
 app/src/main/assets
+.idea
