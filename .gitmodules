@@ -1,0 +1,3 @@
+[submodule "sdl/jni/SDL"]
+	path = sdl/jni/SDL
+	url = https://github.com/bovacu/SDL
