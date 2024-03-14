@@ -1,0 +1,13 @@
+config:glEsVersion=0x00030000
+
+#orientation can be: unspecified, landscape, portrait, reverseLandscape or reversePortrait
+config:screenOrientation=portrait
+
+#APPLICATION_ID is the application_id for ads. APPLICATION_ID=0 to disable
+config:APPLICATION_ID=ca-app-pub-3940256099942544~3347511713
+config:appName=RDEAndroidApp
+config:appDescription=This is a RDE android app.
+config:versionName=1.0.0.0
+
+permission:WAKE_LOCK=0
+permission:INTERNET=0

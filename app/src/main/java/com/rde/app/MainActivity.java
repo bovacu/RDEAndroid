@@ -13,6 +13,9 @@ public class MainActivity extends SDLActivity {
         return new String[]{
                 "SDL3",
                 "EGL",
+				"crypto",
+				"ssl",
+				"curl",
                 "cglm",
                 "GLESv3",
                 "RDEAndroidApp"
