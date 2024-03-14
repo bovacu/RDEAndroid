@@ -1,0 +1,1 @@
+Compiled with this repo https://github.com/ibaoger/libcurl-android
