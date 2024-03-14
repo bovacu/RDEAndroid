@@ -1,13 +1,27 @@
 config:glEsVersion=0x00030000
-
-#orientation can be: unspecified, landscape, portrait, reverseLandscape or reversePortrait
+# orientation can be: unspecified, landscape, portrait, reverseLandscape or reversePortrait
 config:screenOrientation=portrait
-
-#APPLICATION_ID is the application_id for ads. APPLICATION_ID=0 to disable
+# APPLICATION_ID is the application_id for ads. APPLICATION_ID=0 to disable
 config:APPLICATION_ID=ca-app-pub-3940256099942544~3347511713
 config:appName=RDEAndroidApp
+# appDescription is not working right now.
 config:appDescription=This is a RDE android app.
 config:versionName=1.0.0.0
 
-permission:WAKE_LOCK=0
-permission:INTERNET=0
+# android.permissions.* can be added here, any permission added here with value 1, will be added to the
+# manifest. Any permission not added or set to 0 will not be added to the manifest (except the ones added
+# by default by android). See https://developer.android.com/reference/android/Manifest.permission#constants
+permission:WAKE_LOCK=1
+permission:INTERNET=1
+permission:POST_NOTIFICATIONS=1
+permission:BLUETOOTH=0
+
+# android.hardware.* can be added here, any hardware added here with value 1, will be added to the
+# manifest. Any hardware not added or set to 0 will not be added to the manifest (except the ones added
+# by default by android). See https://developer.android.com/guide/topics/manifest/uses-feature-element#hw-features
+hardware:bluetooth=1
+
+# android.software.* can be added here, any software added here with value 1, will be added to the
+# manifest. Any software not added or set to 0 will not be added to the manifest (except the ones added
+# by default by android). See https://developer.android.com/guide/topics/manifest/uses-feature-element#sw-features
+software:webview=0
